@@ -28,16 +28,8 @@ export default function RestaurantMenuPage() {
   const slug = params.slug as string;
 
   useEffect(() => {
-    if (!authLoading && (!profile || profile.role !== 'CUSTOMER')) {
-      router.push('/login');
-    }
-  }, [profile, authLoading, router]);
-
-  useEffect(() => {
-    if (profile?.role === 'CUSTOMER') {
-      fetchRestaurant();
-    }
-  }, [profile, slug]);
+    fetchRestaurant();
+  }, [slug]);
 
   const fetchRestaurant = async () => {
     const { data: restaurantData, error: restaurantError } = await supabase
@@ -176,7 +168,7 @@ export default function RestaurantMenuPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white">
         <div className="container mx-auto px-4 py-6">
-          <Link href="/menu" className="flex items-center gap-2 text-white/90 hover:text-white mb-4">
+          <Link href="/" className="flex items-center gap-2 text-white/90 hover:text-white mb-4">
             <ArrowLeft className="h-4 w-4" />
             Back to Restaurants
           </Link>
