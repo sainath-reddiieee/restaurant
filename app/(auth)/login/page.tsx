@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail, resetPassword } from '@/lib/supabase/auth';
+import { supabase } from '@/lib/supabase/client';
 import { Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -60,17 +61,49 @@ export default function LoginPage() {
         description: 'Signed in successfully!',
       });
 
-      console.log('⏳ Waiting for AuthProvider to load profile...');
+      console.log('⏳ Waiting for profile to load...');
 
-      // Wait for toast to show and AuthProvider to process the session
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const userId = data.user.id;
 
-      console.log('🔄 Refreshing router...');
-      router.refresh();
+      // Wait for profile to be created/loaded
+      let attempts = 0;
+      let profile = null;
+      while (attempts < 10) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
 
-      await new Promise(resolve => setTimeout(resolve, 500));
+        if (profileData) {
+          profile = profileData;
+          break;
+        }
 
-      const redirectPath = new URLSearchParams(window.location.search).get('redirect') || '/';
+        await new Promise(resolve => setTimeout(resolve, 300));
+        attempts++;
+      }
+
+      console.log('👤 Profile loaded:', profile);
+
+      // Determine redirect based on role
+      let redirectPath = '/';
+      if (profile) {
+        switch (profile.role) {
+          case 'SUPER_ADMIN':
+            redirectPath = '/admin';
+            break;
+          case 'RESTAURANT_OWNER':
+            redirectPath = '/partner';
+            break;
+          case 'CUSTOMER':
+            redirectPath = '/';
+            break;
+          default:
+            redirectPath = '/';
+        }
+      }
+
       console.log('🚀 Redirecting to:', redirectPath);
       router.push(redirectPath);
     } catch (error) {
