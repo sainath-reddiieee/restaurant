@@ -198,27 +198,19 @@ export default function Home() {
           </div>
         )}
 
-        <div className="mt-12 bg-gradient-to-r from-orange-500 via-red-500 to-red-600 rounded-2xl p-6 text-white shadow-2xl hover:shadow-3xl transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 delay-500 hover:scale-105 cursor-pointer">
+        <div className="mt-12 bg-gradient-to-r from-orange-500 via-red-500 to-red-600 rounded-2xl p-6 text-white shadow-2xl transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 delay-500">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse">
               <Flame className="h-6 w-6 animate-bounce" />
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-                Loot Mode - Flash Sales!
-                <span className="text-xs bg-white/20 px-2 py-1 rounded-full animate-pulse">HOT</span>
+                Late Night Loot Mode
+                <span className="text-xs bg-white/20 px-2 py-1 rounded-full animate-pulse">LIVE</span>
               </h3>
-              <p className="text-white/90 text-sm mb-3">
-                Grab excess inventory at massive discounts. Limited stock, first come first served!
+              <p className="text-white/90 text-sm">
+                Look for ⚡ flash sale items at massive discounts when browsing restaurant menus. Limited stock, first come first served!
               </p>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => router.push('/dashboard/loot')}
-                className="bg-white text-orange-600 hover:bg-white/90 hover:scale-105 transition-transform duration-300 shadow-lg"
-              >
-                View Loot Deals
-              </Button>
             </div>
           </div>
         </div>
