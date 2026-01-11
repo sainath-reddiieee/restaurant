@@ -27,36 +27,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .maybeSingle();
 
+    // FIX: Check for errors first before assuming profile doesn't exist
+    if (error) {
+      console.error('Error fetching profile:', error);
+      return;
+    }
+
     if (data) {
+      console.log('Profile loaded successfully:', data);
       setProfile(data);
       return;
     }
 
-    if (!data) {
-      console.log('Profile not found, creating one...');
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const phone = user.phone || user.user_metadata?.phone || user.email || '';
-        const fullName = user.user_metadata?.full_name || '';
+    // Only create profile if there's NO error AND NO data (profile truly doesn't exist)
+    console.log('Profile not found, creating one...');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const phone = user.phone || user.user_metadata?.phone || user.email || '';
+      const fullName = user.user_metadata?.full_name || '';
 
-        const { data: newProfile, error: createError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            phone,
-            full_name: fullName,
-            role: 'CUSTOMER',
-            wallet_balance: 0,
-          })
-          .select()
-          .maybeSingle();
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          phone,
+          full_name: fullName,
+          role: 'CUSTOMER',
+          wallet_balance: 0,
+        })
+        .select()
+        .maybeSingle();
 
-        if (newProfile) {
-          console.log('Profile created successfully');
-          setProfile(newProfile);
-        } else {
-          console.error('Error creating profile:', createError);
-        }
+      if (newProfile) {
+        console.log('Profile created successfully');
+        setProfile(newProfile);
+      } else {
+        console.error('Error creating profile:', createError);
       }
     }
   };
