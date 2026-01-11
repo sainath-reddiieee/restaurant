@@ -38,11 +38,16 @@ export default function AdminDashboard() {
     slug: '',
   });
 
+  // FIX: Prevent infinite redirect loops by only redirecting once when auth check completes
+  // Do not redirect if still loading to avoid race conditions
   useEffect(() => {
-    if (!authLoading && (!profile || profile.role !== 'SUPER_ADMIN')) {
-      router.push('/');
+    if (!authLoading) {
+      // Only redirect if we definitively know user is not authorized
+      if (!profile || profile.role !== 'SUPER_ADMIN') {
+        router.replace('/');  // Use replace to avoid back button issues
+      }
     }
-  }, [profile, authLoading, router]);
+  }, [authLoading, profile, router]);
 
   useEffect(() => {
     if (profile?.role === 'SUPER_ADMIN') {
@@ -167,10 +172,27 @@ export default function AdminDashboard() {
     }
   };
 
+  // FIX: Show loading state while authentication or data is loading
+  // Prevent rendering dashboard content before authorization check completes
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-4" />
+          <p className="text-slate-400 text-sm">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // FIX: Additional safety check - don't render if not authorized
+  if (!profile || profile.role !== 'SUPER_ADMIN') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-4" />
+          <p className="text-slate-400 text-sm">Redirecting...</p>
+        </div>
       </div>
     );
   }

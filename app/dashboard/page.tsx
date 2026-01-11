@@ -23,11 +23,15 @@ export default function RestaurantDashboard() {
   const [loading, setLoading] = useState(true);
   const [totalSales, setTotalSales] = useState(0);
 
+  // FIX: Prevent redirect loops by checking auth state properly
+  // Only redirect when auth loading is complete and user is unauthorized
   useEffect(() => {
-    if (!authLoading && (!profile || profile.role !== 'RESTAURANT')) {
-      router.push('/');
+    if (!authLoading) {
+      if (!profile || profile.role !== 'RESTAURANT') {
+        router.replace('/');  // Use replace to prevent back button issues
+      }
     }
-  }, [profile, authLoading, router]);
+  }, [authLoading, profile, router]);
 
   useEffect(() => {
     if (profile?.role === 'RESTAURANT') {
@@ -162,18 +166,37 @@ export default function RestaurantDashboard() {
     return orders.filter(order => order.status === status);
   };
 
+  // FIX: Proper loading state with message
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-blue-900 text-sm">Loading restaurant dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // FIX: Additional authorization check before rendering
+  if (!profile || profile.role !== 'RESTAURANT') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-blue-900 text-sm">Redirecting...</p>
+        </div>
       </div>
     );
   }
 
   if (!restaurant) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Restaurant not found</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
+        <div className="text-center">
+          <p className="text-blue-900 text-lg font-semibold mb-2">Restaurant not found</p>
+          <p className="text-blue-700 text-sm">Please contact support for assistance.</p>
+        </div>
       </div>
     );
   }

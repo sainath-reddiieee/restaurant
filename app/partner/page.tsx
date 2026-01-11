@@ -18,36 +18,54 @@ export default function PartnerLoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  // FIX: Optimize session check and remove unnecessary delays
+  // Check if user is already logged in and redirect to appropriate dashboard
   useEffect(() => {
+    let isMounted = true;  // Prevent state updates on unmounted component
+
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .maybeSingle();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
 
-        if (profile) {
-          router.refresh();
-          await new Promise(resolve => setTimeout(resolve, 500));
+        if (!isMounted) return;  // Component unmounted, don't continue
 
-          switch (profile.role) {
-            case 'SUPER_ADMIN':
-              router.push('/admin');
-              return;
-            case 'RESTAURANT':
-              router.push('/dashboard');
-              return;
-            default:
-              router.push('/');
+        if (session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .maybeSingle();
+
+          if (!isMounted) return;  // Component unmounted, don't continue
+
+          if (profile) {
+            // Direct navigation without delays - client-side routing is instant
+            switch (profile.role) {
+              case 'SUPER_ADMIN':
+                router.replace('/admin');  // Use replace to prevent back button loops
+                return;
+              case 'RESTAURANT':
+                router.replace('/dashboard');
+                return;
+              default:
+                router.replace('/');
+            }
           }
         }
+      } catch (error) {
+        console.error('Session check error:', error);
       }
     };
+
     checkSession();
+
+    return () => {
+      isMounted = false;  // Cleanup to prevent memory leaks
+    };
   }, [router]);
 
+  // FIX: Remove excessive delays and optimize login flow
+  // Use immediate client-side navigation after successful authentication
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -66,6 +84,7 @@ export default function PartnerLoginPage() {
       }
 
       if (data.user && data.session) {
+        // Fetch user profile to determine role
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
@@ -77,27 +96,27 @@ export default function PartnerLoginPage() {
           description: 'Signed in successfully!',
         });
 
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        router.refresh();
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        if (profile) {
-          switch (profile.role) {
-            case 'SUPER_ADMIN':
-              router.push('/admin');
-              break;
-            case 'RESTAURANT':
-              router.push('/dashboard');
-              break;
-            default:
-              router.push('/');
+        // FIX: Small delay only to show success toast, then navigate directly
+        // Client-side navigation with router.replace() doesn't trigger middleware
+        setTimeout(() => {
+          if (profile) {
+            switch (profile.role) {
+              case 'SUPER_ADMIN':
+                router.replace('/admin');  // Use replace to prevent back button issues
+                break;
+              case 'RESTAURANT':
+                router.replace('/dashboard');
+                break;
+              default:
+                router.replace('/');
+            }
+          } else {
+            router.replace('/');
           }
-        } else {
-          router.push('/');
-        }
+        }, 800);  // Reduced from 2500ms to 800ms
       }
     } catch (error) {
+      console.error('Login error:', error);
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',
