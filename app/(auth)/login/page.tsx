@@ -151,7 +151,7 @@ export default function LoginPage() {
           <CardDescription className="text-center">
             {isSignUp
               ? 'Sign up to start ordering from local restaurants'
-              : 'Sign in to your Anantapur OS account'
+              : 'Sign in to your GO515 account'
             }
           </CardDescription>
         </CardHeader>

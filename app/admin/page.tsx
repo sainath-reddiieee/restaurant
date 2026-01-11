@@ -13,7 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Store, DollarSign, Package } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 
@@ -144,6 +145,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const deleteRestaurant = async (id: string, name: string) => {
+    const { error } = await supabase
+      .from('restaurants')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `${name} has been deleted`,
+      });
+      fetchRestaurants();
+      fetchStats();
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -153,16 +176,28 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="bg-gradient-to-r from-amber-600 to-orange-600 shadow-xl border-b border-amber-700">
+        <div className="container mx-auto px-6 py-6">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+              <Shield className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-white tracking-tight">Admin Command Center</h1>
+              <p className="text-amber-100 mt-1">Super Admin Dashboard - Full Platform Control</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Concierge Dashboard</h1>
-            <p className="text-gray-600 mt-1">Manage restaurants and track platform revenue</p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-orange-600 hover:bg-orange-700">
+              <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg">
                 <Plus className="mr-2 h-4 w-4" />
                 Onboard Restaurant
               </Button>
@@ -258,69 +293,70 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
+          <Card className="bg-gradient-to-br from-green-500 to-emerald-600 border-0 text-white shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-white">Net Profit</CardTitle>
+              <DollarSign className="h-5 w-5 text-green-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatPrice(totalRevenue)}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{formatPrice(totalRevenue)}</div>
+              <p className="text-xs text-green-100 mt-1">
                 Tech Fee + Delivery Margin
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-500 to-cyan-600 border-0 text-white shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-white">Total Orders</CardTitle>
+              <Package className="h-5 w-5 text-blue-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{totalOrders}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{totalOrders}</div>
+              <p className="text-xs text-blue-100 mt-1">
                 Across all restaurants
               </p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-amber-500 to-orange-600 border-0 text-white shadow-xl">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Restaurants</CardTitle>
-              <Store className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-white">Active Restaurants</CardTitle>
+              <Store className="h-5 w-5 text-amber-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{restaurants.filter(r => r.is_active).length}</div>
-              <p className="text-xs text-muted-foreground">
+              <div className="text-3xl font-bold">{restaurants.filter(r => r.is_active).length}</div>
+              <p className="text-xs text-amber-100 mt-1">
                 Out of {restaurants.length} total
               </p>
             </CardContent>
           </Card>
         </div>
 
-        <Card>
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
           <CardHeader>
-            <CardTitle>Restaurants</CardTitle>
-            <CardDescription>Manage all onboarded restaurants</CardDescription>
+            <CardTitle className="text-white">Restaurants</CardTitle>
+            <CardDescription className="text-slate-400">Manage all onboarded restaurants</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Owner Phone</TableHead>
-                  <TableHead>Tech Fee</TableHead>
-                  <TableHead>Delivery Fee</TableHead>
-                  <TableHead>Free Delivery</TableHead>
-                  <TableHead>Status</TableHead>
+                <TableRow className="border-slate-700 hover:bg-slate-700/50">
+                  <TableHead className="text-slate-300">Name</TableHead>
+                  <TableHead className="text-slate-300">Owner Phone</TableHead>
+                  <TableHead className="text-slate-300">Tech Fee</TableHead>
+                  <TableHead className="text-slate-300">Delivery Fee</TableHead>
+                  <TableHead className="text-slate-300">Free Delivery</TableHead>
+                  <TableHead className="text-slate-300">Status</TableHead>
+                  <TableHead className="text-slate-300">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {restaurants.map((restaurant) => (
-                  <TableRow key={restaurant.id}>
-                    <TableCell className="font-medium">{restaurant.name}</TableCell>
-                    <TableCell>{restaurant.owner_phone}</TableCell>
-                    <TableCell>{formatPrice(restaurant.tech_fee)}</TableCell>
-                    <TableCell>{formatPrice(restaurant.delivery_fee)}</TableCell>
-                    <TableCell>
+                  <TableRow key={restaurant.id} className="border-slate-700 hover:bg-slate-700/30">
+                    <TableCell className="font-medium text-white">{restaurant.name}</TableCell>
+                    <TableCell className="text-slate-300">{restaurant.owner_phone}</TableCell>
+                    <TableCell className="text-slate-300">{formatPrice(restaurant.tech_fee)}</TableCell>
+                    <TableCell className="text-slate-300">{formatPrice(restaurant.delivery_fee)}</TableCell>
+                    <TableCell className="text-slate-300">
                       {restaurant.free_delivery_threshold ? formatPrice(restaurant.free_delivery_threshold) : 'None'}
                     </TableCell>
                     <TableCell>
@@ -333,6 +369,32 @@ export default function AdminDashboard() {
                           {restaurant.is_active ? 'Active' : 'Inactive'}
                         </Badge>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-900/20">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Restaurant</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete {restaurant.name}? This action cannot be undone and will remove all associated menu items, orders, and data.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteRestaurant(restaurant.id, restaurant.name)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -179,79 +179,84 @@ export default function RestaurantDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">{restaurant.name}</h1>
-            <p className="text-sm text-gray-600">Restaurant Dashboard</p>
+    <div className="min-h-screen bg-gradient-to-br from-sky-50 via-blue-50 to-cyan-50">
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 shadow-lg border-b-2 border-blue-700">
+        <div className="container mx-auto px-6 py-5 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-white/20 backdrop-blur-sm rounded-xl">
+              <ChefHat className="h-7 w-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">{restaurant.name}</h1>
+              <p className="text-sm text-blue-100">Restaurant Operations Hub</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Link href="/dashboard/menu">
-              <Button variant="outline">Menu</Button>
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">Menu</Button>
             </Link>
             <Link href="/dashboard/loot">
-              <Button variant="outline">Loot Mode</Button>
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">Loot Mode</Button>
             </Link>
             <Link href="/dashboard/coupons">
-              <Button variant="outline">Coupons</Button>
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">Coupons</Button>
             </Link>
-            <Button variant="ghost" onClick={signOut}>Logout</Button>
+            <Button className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm" onClick={signOut}>Logout</Button>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
+          <Card className="bg-gradient-to-br from-emerald-500 to-green-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-white">Total Sales</CardTitle>
+              <DollarSign className="h-5 w-5 text-emerald-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{formatPrice(totalSales)}</div>
-              <p className="text-xs text-muted-foreground">Revenue before delivery fees</p>
+              <div className="text-3xl font-bold">{formatPrice(totalSales)}</div>
+              <p className="text-xs text-emerald-100">Revenue before delivery fees</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-500 to-indigo-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-white">Total Orders</CardTitle>
+              <Package className="h-5 w-5 text-blue-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{orders.length}</div>
-              <p className="text-xs text-muted-foreground">All time orders</p>
+              <div className="text-3xl font-bold">{orders.length}</div>
+              <p className="text-xs text-blue-100">All time orders</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-orange-500 to-red-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium text-white">Pending Orders</CardTitle>
+              <Clock className="h-5 w-5 text-orange-100" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">{filterOrders('PENDING').length}</div>
-              <p className="text-xs text-muted-foreground">Needs attention</p>
+              <div className="text-3xl font-bold">{filterOrders('PENDING').length}</div>
+              <p className="text-xs text-orange-100">Needs attention</p>
             </CardContent>
           </Card>
         </div>
 
         <Tabs defaultValue="pending" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="pending">Pending ({filterOrders('PENDING').length})</TabsTrigger>
-            <TabsTrigger value="confirmed">Confirmed ({filterOrders('CONFIRMED').length})</TabsTrigger>
-            <TabsTrigger value="cooking">Cooking ({filterOrders('COOKING').length})</TabsTrigger>
-            <TabsTrigger value="ready">Ready ({filterOrders('READY').length})</TabsTrigger>
-            <TabsTrigger value="delivered">Delivered ({filterOrders('DELIVERED').length})</TabsTrigger>
+          <TabsList className="bg-white shadow-md border border-blue-100">
+            <TabsTrigger value="pending" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Pending ({filterOrders('PENDING').length})</TabsTrigger>
+            <TabsTrigger value="confirmed" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Confirmed ({filterOrders('CONFIRMED').length})</TabsTrigger>
+            <TabsTrigger value="cooking" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Cooking ({filterOrders('COOKING').length})</TabsTrigger>
+            <TabsTrigger value="ready" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Ready ({filterOrders('READY').length})</TabsTrigger>
+            <TabsTrigger value="delivered" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">Delivered ({filterOrders('DELIVERED').length})</TabsTrigger>
           </TabsList>
 
           {['PENDING', 'CONFIRMED', 'COOKING', 'READY', 'DELIVERED'].map(status => (
             <TabsContent key={status} value={status.toLowerCase()} className="space-y-4">
               {filterOrders(status).map(order => (
-                <Card key={order.id}>
+                <Card key={order.id} className="bg-white shadow-md hover:shadow-lg transition-shadow border-l-4 border-l-blue-500">
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg">{order.short_id}</CardTitle>
+                        <CardTitle className="text-lg text-blue-900">{order.short_id}</CardTitle>
                         <CardDescription>
                           {new Date(order.created_at).toLocaleString()}
                         </CardDescription>
@@ -294,7 +299,7 @@ export default function RestaurantDashboard() {
                       {getNextStatus(order.status) && (
                         <Button
                           onClick={() => updateOrderStatus(order.id, getNextStatus(order.status)!)}
-                          className="flex-1"
+                          className="flex-1 bg-blue-600 hover:bg-blue-700"
                         >
                           Mark as {getNextStatus(order.status)}
                         </Button>
@@ -303,6 +308,7 @@ export default function RestaurantDashboard() {
                         <Button
                           variant="outline"
                           onClick={() => sendToWhatsApp(order)}
+                          className="border-blue-600 text-blue-600 hover:bg-blue-50"
                         >
                           Send to WhatsApp
                         </Button>
@@ -312,7 +318,7 @@ export default function RestaurantDashboard() {
                 </Card>
               ))}
               {filterOrders(status).length === 0 && (
-                <Card>
+                <Card className="bg-white shadow-md">
                   <CardContent className="py-8 text-center text-gray-500">
                     No {status.toLowerCase()} orders
                   </CardContent>

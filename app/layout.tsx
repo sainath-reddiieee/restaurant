@@ -8,8 +8,8 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Anantapur OS - Food Delivery Platform',
-  description: 'Digital Storefront & Logistics OS for Tier-2 city restaurants',
+  title: 'GO515 - Food Delivery Platform',
+  description: 'Digital Storefront & Logistics Platform for Local Restaurants',
   openGraph: {
     images: [
       {
