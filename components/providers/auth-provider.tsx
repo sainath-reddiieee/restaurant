@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -29,6 +29,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (data) {
       setProfile(data);
+      return;
+    }
+
+    if (!data) {
+      console.log('Profile not found, creating one...');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const phone = user.phone || user.user_metadata?.phone || user.email || '';
+        const fullName = user.user_metadata?.full_name || '';
+
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            phone,
+            full_name: fullName,
+            role: 'CUSTOMER',
+            wallet_balance: 0,
+          })
+          .select()
+          .maybeSingle();
+
+        if (newProfile) {
+          console.log('Profile created successfully');
+          setProfile(newProfile);
+        } else {
+          console.error('Error creating profile:', createError);
+        }
+      }
     }
   };
 

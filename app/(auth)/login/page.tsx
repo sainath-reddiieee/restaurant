@@ -55,13 +55,48 @@ export default function LoginPage() {
             variant: 'destructive',
           });
           setLoading(false);
-        } else if (data.user) {
+        } else if (data.user && data.session) {
           console.log('Login successful:', data.user.id);
-          toast({
-            title: 'Success',
-            description: 'Signed in successfully! Redirecting...',
-          });
-          window.location.href = '/';
+
+          try {
+            const { supabase: supabaseClient } = await import('@/lib/supabase/client');
+            const { data: profile, error: profileError } = await supabaseClient
+              .from('profiles')
+              .select('role')
+              .eq('id', data.user.id)
+              .maybeSingle();
+
+            if (profileError) {
+              console.error('Profile fetch error:', profileError);
+            }
+
+            toast({
+              title: 'Success',
+              description: 'Signed in successfully! Redirecting...',
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            if (profile?.role) {
+              switch (profile.role) {
+                case 'SUPER_ADMIN':
+                  window.location.href = '/admin';
+                  break;
+                case 'RESTAURANT':
+                  window.location.href = '/dashboard';
+                  break;
+                case 'CUSTOMER':
+                default:
+                  window.location.href = '/';
+                  break;
+              }
+            } else {
+              window.location.href = '/';
+            }
+          } catch (err) {
+            console.error('Post-login error:', err);
+            window.location.href = '/';
+          }
         } else {
           console.error('Login failed: No user data returned');
           toast({

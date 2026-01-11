@@ -6,10 +6,12 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const path = req.nextUrl.pathname
 
-  const authToken = req.cookies.get('sb-access-token')?.value
-  const refreshToken = req.cookies.get('sb-refresh-token')?.value
+  const allCookies = req.cookies.getAll()
+  const authTokenCookie = allCookies.find(cookie =>
+    cookie.name.includes('auth-token') && !cookie.name.includes('code-verifier')
+  )
 
-  if (!authToken || !refreshToken) {
+  if (!authTokenCookie?.value) {
     if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
       return NextResponse.redirect(new URL('/login', req.url))
     }
@@ -17,19 +19,37 @@ export async function middleware(req: NextRequest) {
   }
 
   try {
+    let authData;
+    try {
+      authData = JSON.parse(authTokenCookie.value);
+    } catch (e) {
+      console.error('Failed to parse auth token:', e);
+      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
+      return res;
+    }
+
+    if (!authData?.access_token) {
+      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
+      return res
+    }
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         global: {
           headers: {
-            Authorization: `Bearer ${authToken}`
+            Authorization: `Bearer ${authData.access_token}`
           }
         }
       }
     )
 
-    const { data: { user } } = await supabase.auth.getUser(authToken)
+    const { data: { user } } = await supabase.auth.getUser(authData.access_token)
 
     if (!user) {
       if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
@@ -42,30 +62,32 @@ export async function middleware(req: NextRequest) {
       .from('profiles')
       .select('role')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
     if (!profile) {
-      return NextResponse.redirect(new URL('/login', req.url))
+      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
+        return NextResponse.redirect(new URL('/login', req.url))
+      }
+      return res
     }
 
     const role = profile.role
 
     if (path.startsWith('/admin')) {
       if (role !== 'SUPER_ADMIN') {
-        const response = NextResponse.redirect(new URL('/', req.url))
-        return response
+        return NextResponse.redirect(new URL('/', req.url))
       }
     }
 
     if (path.startsWith('/dashboard')) {
       if (role === 'CUSTOMER') {
-        const response = NextResponse.redirect(new URL('/', req.url))
-        return response
+        return NextResponse.redirect(new URL('/', req.url))
       }
     }
 
     return res
   } catch (error) {
+    console.error('Middleware error:', error);
     if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
       return NextResponse.redirect(new URL('/login', req.url))
     }

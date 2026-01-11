@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/providers/auth-provider';
 import { Button } from '@/components/ui/button';
@@ -9,26 +9,29 @@ import { Loader2, ShoppingBag, Store, ChefHat } from 'lucide-react';
 export default function Home() {
   const { user, profile, loading } = useAuth();
   const router = useRouter();
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     if (!loading && user && profile) {
+      setIsRedirecting(true);
       switch (profile.role) {
         case 'SUPER_ADMIN':
-          router.push('/admin');
+          window.location.href = '/admin';
           break;
         case 'RESTAURANT':
-          router.push('/dashboard');
+          window.location.href = '/dashboard';
           break;
         case 'CUSTOMER':
-          router.push('/menu');
+          window.location.href = '/menu';
           break;
         default:
+          setIsRedirecting(false);
           break;
       }
     }
-  }, [user, profile, loading, router]);
+  }, [user, profile, loading]);
 
-  if (loading) {
+  if (loading || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
@@ -36,10 +39,13 @@ export default function Home() {
     );
   }
 
-  if (user && profile) {
+  if (user && !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-4" />
+          <p className="text-gray-600">Setting up your account...</p>
+        </div>
       </div>
     );
   }
