@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { signInWithEmail, signUpWithEmail } from '@/lib/supabase/auth';
-import { Mail, ArrowRight } from 'lucide-react';
+import { signInWithEmail, signUpWithEmail, signInWithGoogle } from '@/lib/supabase/auth';
+import { Mail, ArrowRight, Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -62,6 +62,28 @@ export default function LoginPage() {
         variant: 'destructive',
       });
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        });
+        setLoading(false);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to sign in with Google.',
+        variant: 'destructive',
+      });
       setLoading(false);
     }
   };
@@ -144,6 +166,26 @@ export default function LoginPage() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+          >
+            <Chrome className="mr-2 h-4 w-4" />
+            Google
+          </Button>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
