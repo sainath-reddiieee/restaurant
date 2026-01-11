@@ -36,10 +36,24 @@ export default function PartnerLoginPage() {
       }
 
       if (data.user && data.session) {
+        toast({
+          title: 'Success',
+          description: 'Signed in successfully! Redirecting...',
+        });
+
         setIsRedirecting(true);
 
         try {
           const { supabase: supabaseClient } = await import('@/lib/supabase/client');
+
+          await new Promise(resolve => setTimeout(resolve, 2000));
+
+          const { data: { session: verifiedSession } } = await supabaseClient.auth.getSession();
+
+          if (!verifiedSession) {
+            throw new Error('Session not established');
+          }
+
           const { data: profile, error: profileError } = await supabaseClient
             .from('profiles')
             .select('role')
@@ -61,13 +75,6 @@ export default function PartnerLoginPage() {
             setIsRedirecting(false);
             return;
           }
-
-          toast({
-            title: 'Success',
-            description: 'Signed in successfully! Redirecting...',
-          });
-
-          await new Promise(resolve => setTimeout(resolve, 800));
 
           if (profile?.role === 'SUPER_ADMIN') {
             window.location.href = '/admin';

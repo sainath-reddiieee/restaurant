@@ -6,10 +6,6 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const path = req.nextUrl.pathname
 
-  if (path === '/login' || path === '/callback' || path === '/partner') {
-    return res
-  }
-
   const allCookies = req.cookies.getAll()
   const authTokenCookie = allCookies.find(cookie =>
     cookie.name.includes('auth-token') && !cookie.name.includes('code-verifier')

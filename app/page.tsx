@@ -34,14 +34,14 @@ export default function Home() {
     if (!authLoading && user && profile) {
       switch (profile.role) {
         case 'SUPER_ADMIN':
-          window.location.href = '/admin';
+          router.push('/admin');
           return;
         case 'RESTAURANT':
-          window.location.href = '/dashboard';
+          router.push('/dashboard');
           return;
       }
     }
-  }, [user, profile, authLoading]);
+  }, [user, profile, authLoading, router]);
 
   useEffect(() => {
     const fetchRestaurants = async () => {

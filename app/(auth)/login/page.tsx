@@ -58,12 +58,24 @@ export default function LoginPage() {
           setLoading(false);
         } else if (data.user && data.session) {
           console.log('Login successful:', data.user.id);
+
+          toast({
+            title: 'Success',
+            description: 'Signed in successfully! Redirecting...',
+          });
+
           setIsRedirecting(true);
 
           try {
             const { supabase: supabaseClient } = await import('@/lib/supabase/client');
 
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            const { data: { session: verifiedSession } } = await supabaseClient.auth.getSession();
+
+            if (!verifiedSession) {
+              throw new Error('Session not established');
+            }
 
             const { data: profile, error: profileError } = await supabaseClient
               .from('profiles')
@@ -75,28 +87,21 @@ export default function LoginPage() {
               console.error('Profile fetch error:', profileError);
             }
 
-            toast({
-              title: 'Success',
-              description: 'Signed in successfully! Redirecting...',
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
             if (profile?.role) {
               switch (profile.role) {
                 case 'SUPER_ADMIN':
-                  router.push('/admin');
+                  window.location.href = '/admin';
                   break;
                 case 'RESTAURANT':
-                  router.push('/dashboard');
+                  window.location.href = '/dashboard';
                   break;
                 case 'CUSTOMER':
                 default:
-                  router.push('/');
+                  window.location.href = '/';
                   break;
               }
             } else {
-              router.push('/');
+              window.location.href = '/';
             }
           } catch (err) {
             console.error('Post-login error:', err);
