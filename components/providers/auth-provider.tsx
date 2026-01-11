@@ -21,23 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
-    // Verify session exists before querying
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      console.error('❌ No session available for profile query');
-      // Retry up to 3 times with exponential backoff
-      if (retryCount < 3) {
-        const delay = Math.pow(2, retryCount) * 100; // 100ms, 200ms, 400ms
-        console.log(`Retrying profile fetch in ${delay}ms... (attempt ${retryCount + 1}/3)`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchProfile(userId, retryCount + 1);
-      }
-      return;
-    }
-
-    console.log('🔍 Fetching profile for user:', userId);
-    console.log('📝 Session exists:', !!session, 'Token length:', session.access_token?.length);
+    console.log('🔍 Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
 
     const { data, error } = await supabase
       .from('profiles')
@@ -45,17 +29,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('id', userId)
       .maybeSingle();
 
-    // Check for RLS errors specifically
+    // Check for RLS errors specifically - these indicate session token not attached yet
     if (error) {
-      console.error('❌ Error fetching profile:', error);
+      console.error('❌ Error fetching profile:', error.message, 'Code:', error.code);
 
-      if (error.message?.includes('RLS') || error.message?.includes('policy') || error.code === 'PGRST301') {
-        console.error('🚨 RLS POLICY VIOLATION - Session token may not be attached properly');
-        console.error('Session user ID:', session.user?.id);
-        console.error('Querying for ID:', userId);
-        console.error('IDs match:', session.user?.id === userId);
+      // RLS policy violations or JWT errors mean token isn't attached yet - retry
+      if ((error.message?.includes('RLS') ||
+           error.message?.includes('policy') ||
+           error.message?.includes('JWT') ||
+           error.code === 'PGRST301' ||
+           error.code === '42501') &&
+          retryCount < 5) {
+        const delay = Math.pow(2, retryCount) * 100; // 100ms, 200ms, 400ms, 800ms, 1600ms
+        console.log(`🔄 Session token not ready, retrying in ${delay}ms... (attempt ${retryCount + 1}/5)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchProfile(userId, retryCount + 1);
       }
 
+      // Non-retryable error
+      console.error('🚨 Non-retryable error or max retries reached');
+      const { data: { session } } = await supabase.auth.getSession();
+      console.error('Debug - Session exists:', !!session);
+      console.error('Debug - Session user ID:', session?.user?.id);
+      console.error('Debug - Querying for ID:', userId);
       return;
     }
 
@@ -126,9 +122,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           console.log('👤 User authenticated:', session.user.id);
 
-          // Give Supabase client time to attach the session token
+          // Give Supabase client time to persist and attach the session token
           // This is critical for RLS policies to work
-          await new Promise(resolve => setTimeout(resolve, 150));
+          // Start with 300ms to ensure cookies are written and client state is updated
+          await new Promise(resolve => setTimeout(resolve, 300));
 
           await fetchProfile(session.user.id);
         } else {
