@@ -221,7 +221,7 @@ export default function CheckoutPage() {
             console.error('Failed to create guest profile:', profileError);
             toast({
               title: 'Error',
-              description: 'Failed to create guest profile. Please try again or login.',
+              description: profileError.message || 'Failed to create guest profile. Please try again or login.',
               variant: 'destructive',
             });
             setSubmitting(false);
