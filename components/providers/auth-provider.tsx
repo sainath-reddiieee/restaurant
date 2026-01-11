@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
     console.log('🔍 Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
 
-    // Debug: Check what auth.uid() returns
+    // Check if session cookie is available
     const { data: sessionCheck } = await supabase.auth.getSession();
     console.log('🔐 Session check before query:', {
       hasSession: !!sessionCheck.session,
@@ -31,6 +31,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       matchesQueryId: sessionCheck.session?.user?.id === userId,
       tokenLength: sessionCheck.session?.access_token?.length
     });
+
+    // If session cookie not available yet and we haven't retried too many times, wait and retry
+    if (!sessionCheck.session && retryCount < 5) {
+      const delay = 200 + (retryCount * 100); // 200ms, 300ms, 400ms, 500ms, 600ms
+      console.log(`⏳ Session cookie not available yet, retrying in ${delay}ms... (attempt ${retryCount + 1}/5)`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchProfile(userId, retryCount + 1);
+    }
 
     const { data, error } = await supabase
       .from('profiles')
@@ -133,10 +141,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (session?.user) {
           console.log('👤 User authenticated:', session.user.id);
 
-          // Give Supabase client time to persist and attach the session token
-          // This is critical for RLS policies to work
-          // Start with 300ms to ensure cookies are written and client state is updated
-          await new Promise(resolve => setTimeout(resolve, 300));
+          // Small delay to let cookie be written (fetchProfile has retry logic)
+          await new Promise(resolve => setTimeout(resolve, 100));
 
           await fetchProfile(session.user.id);
         } else {
