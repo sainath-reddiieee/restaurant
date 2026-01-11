@@ -215,7 +215,9 @@ export default function Home() {
 
       <footer className="border-t border-gray-200 mt-8 sm:mt-12 py-6 sm:py-8 bg-white animate-in fade-in slide-in-from-bottom-4 delay-700">
         <div className="container mx-auto px-3 sm:px-4 text-center text-xs sm:text-sm text-gray-600">
-          <p className="mb-2">Restaurant Partner? <button onClick={() => router.push('/partner')} className="text-orange-600 hover:underline font-medium hover:text-orange-700 transition-colors duration-300">Login here</button></p>
+          {!user && (
+            <p className="mb-2">Restaurant Partner? <button onClick={() => router.push('/partner')} className="text-orange-600 hover:underline font-medium hover:text-orange-700 transition-colors duration-300">Login here</button></p>
+          )}
           <p className="text-[10px] sm:text-xs text-gray-500">© 2026 Anantapur. Digital Storefront & Logistics OS for Tier-2 Cities.</p>
         </div>
       </footer>
