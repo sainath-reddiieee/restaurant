@@ -121,8 +121,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('🚀 AuthProvider: Initializing...');
+    let isSubscribed = true;
 
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isSubscribed) return;
+
       console.log('📦 Initial session check:', !!session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -133,27 +136,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isSubscribed) return;
+
       console.log('🔔 Auth state changed:', event, 'Session exists:', !!session);
 
-      (async () => {
-        setUser(session?.user ?? null);
+      setUser(session?.user ?? null);
 
-        if (session?.user) {
-          console.log('👤 User authenticated:', session.user.id);
-          console.log('🎫 Access token available:', !!session.access_token, 'Length:', session.access_token?.length);
+      if (session?.user) {
+        console.log('👤 User authenticated:', session.user.id);
+        console.log('🎫 Access token available:', !!session.access_token, 'Length:', session.access_token?.length);
 
-          await fetchProfile(session.user.id, session.access_token);
-        } else {
-          console.log('👋 User signed out or session expired');
-          setProfile(null);
-        }
+        fetchProfile(session.user.id, session.access_token);
+      } else {
+        console.log('👋 User signed out or session expired');
+        setProfile(null);
+      }
 
-        setLoading(false);
-      })();
+      setLoading(false);
     });
 
     return () => {
       console.log('🛑 AuthProvider: Cleaning up subscription');
+      isSubscribed = false;
       subscription.unsubscribe();
     };
   }, []);

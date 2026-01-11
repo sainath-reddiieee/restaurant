@@ -52,11 +52,11 @@ export default function AdminDashboard() {
   }, [authLoading, profile, router]);
 
   useEffect(() => {
-    if (profile?.role === 'SUPER_ADMIN') {
+    if (profile?.role === 'SUPER_ADMIN' && loading) {
       fetchRestaurants();
       fetchStats();
     }
-  }, [profile]);
+  }, [profile, loading]);
 
   const fetchRestaurants = async () => {
     const { data, error } = await supabase
@@ -71,15 +71,21 @@ export default function AdminDashboard() {
   };
 
   const fetchStats = async () => {
-    const { data: orders } = await supabase
+    const { count } = await supabase
       .from('orders')
-      .select('net_profit')
-      .returns<Array<{ net_profit: number }>>();
+      .select('*', { count: 'exact', head: true });
 
-    if (orders) {
-      const revenue = orders.reduce((sum, order) => sum + order.net_profit, 0);
+    const { data } = await supabase
+      .from('orders')
+      .select('net_profit');
+
+    if (data) {
+      const revenue = data.reduce((sum, order) => sum + (order.net_profit || 0), 0);
       setTotalRevenue(revenue);
-      setTotalOrders(orders.length);
+    }
+
+    if (count !== null) {
+      setTotalOrders(count);
     }
   };
 

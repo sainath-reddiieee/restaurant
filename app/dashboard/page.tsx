@@ -37,29 +37,37 @@ export default function RestaurantDashboard() {
   }, [authLoading, profile, router]);
 
   useEffect(() => {
-    if (profile?.role === 'RESTAURANT') {
+    if (profile?.role === 'RESTAURANT' && !restaurant && loading) {
       fetchRestaurant();
     }
-  }, [profile]);
+  }, [profile, restaurant, loading]);
 
   const fetchRestaurant = async () => {
-    const { data, error } = await supabase
-      .from('restaurants')
-      .select('*')
-      .eq('owner_phone', profile!.phone)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('restaurants')
+        .select('*')
+        .eq('owner_phone', profile!.phone)
+        .maybeSingle();
 
-    if (data) {
-      setRestaurant(data);
-      fetchOrders(data.id);
-    } else {
-      toast({
-        title: 'Error',
-        description: 'Restaurant not found. Please contact support.',
-        variant: 'destructive',
-      });
+      if (data) {
+        setRestaurant(data);
+        fetchOrders(data.id);
+      } else {
+        console.error('Restaurant not found for phone:', profile!.phone);
+        setRestaurant(null);
+        toast({
+          title: 'Error',
+          description: 'Restaurant not found. Please contact support.',
+          variant: 'destructive',
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching restaurant:', err);
+      setRestaurant(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const fetchOrders = async (restaurantId: string) => {
