@@ -6,19 +6,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } from '@/lib/supabase/auth';
-import { Mail, ArrowRight, Chrome, Loader2 } from 'lucide-react';
+import { signInWithEmail, resetPassword } from '@/lib/supabase/auth';
+import { Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -27,128 +23,72 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        const { error } = await signUpWithEmail(email, password, phone, fullName);
+      const { data, error } = await signInWithEmail(email, password);
 
-        if (error) {
-          toast({
-            title: 'Error',
-            description: error.message,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Success',
-            description: 'Account created! Please sign in.',
-          });
-          setIsSignUp(false);
-          setPassword('');
-        }
-        setLoading(false);
-      } else {
-        const { data, error } = await signInWithEmail(email, password);
-
-        if (error) {
-          console.error('Login error:', error);
-          toast({
-            title: 'Login Failed',
-            description: error.message || 'Invalid email or password. Please try again.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-        } else if (data.user && data.session) {
-          console.log('Login successful:', data.user.id);
-
-          toast({
-            title: 'Success',
-            description: 'Signed in successfully! Redirecting...',
-          });
-
-          setIsRedirecting(true);
-
-          try {
-            const { supabase: supabaseClient } = await import('@/lib/supabase/client');
-
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            const { data: { session: verifiedSession } } = await supabaseClient.auth.getSession();
-
-            if (!verifiedSession) {
-              throw new Error('Session not established');
-            }
-
-            const { data: profile, error: profileError } = await supabaseClient
-              .from('profiles')
-              .select('role')
-              .eq('id', data.user.id)
-              .maybeSingle();
-
-            if (profileError) {
-              console.error('Profile fetch error:', profileError);
-            }
-
-            if (profile?.role) {
-              switch (profile.role) {
-                case 'SUPER_ADMIN':
-                  window.location.href = '/admin';
-                  break;
-                case 'RESTAURANT':
-                  window.location.href = '/dashboard';
-                  break;
-                case 'CUSTOMER':
-                default:
-                  window.location.href = '/';
-                  break;
-              }
-            } else {
-              window.location.href = '/';
-            }
-          } catch (err) {
-            console.error('Post-login error:', err);
-            setIsRedirecting(false);
-            setLoading(false);
-            toast({
-              title: 'Error',
-              description: 'Failed to complete login. Please try again.',
-              variant: 'destructive',
-            });
-          }
-        } else {
-          console.error('Login failed: No user data returned');
-          toast({
-            title: 'Login Failed',
-            description: 'Unable to sign in. Please try again.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-        }
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
       if (error) {
+        console.error('Login error:', error);
         toast({
-          title: 'Error',
-          description: error.message,
+          title: 'Login Failed',
+          description: error.message || 'Invalid email or password. Please try again.',
           variant: 'destructive',
         });
         setLoading(false);
+        return;
       }
+
+      if (!data.user || !data.session) {
+        console.error('Login failed: No user data returned');
+        toast({
+          title: 'Login Failed',
+          description: 'Unable to sign in. Please try again.',
+          variant: 'destructive',
+        });
+        setLoading(false);
+        return;
+      }
+
+      console.log('Login successful:', data.user.id);
+
+      const { supabase: supabaseClient } = await import('@/lib/supabase/client');
+
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Profile fetch error:', profileError);
+      }
+
+      let redirectPath = '/';
+      if (profile?.role) {
+        switch (profile.role) {
+          case 'SUPER_ADMIN':
+            redirectPath = '/admin';
+            break;
+          case 'RESTAURANT':
+            redirectPath = '/dashboard';
+            break;
+          default:
+            redirectPath = '/';
+            break;
+        }
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Signed in successfully!',
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      router.push(redirectPath);
+      router.refresh();
     } catch (error) {
+      console.error('Auth error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to sign in with Google.',
+        description: 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
       setLoading(false);
@@ -197,110 +137,94 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">
-            {isSignUp ? 'Create Account' : 'Welcome Back'}
+            Welcome Back
           </CardTitle>
           <CardDescription className="text-center">
-            {isSignUp
-              ? 'Sign up to start ordering from local restaurants'
-              : 'Sign in to your GO515 account'
-            }
+            Sign in to your Anantapur account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleAuth} className="space-y-4">
-            {isSignUp && (
-              <>
+          {!showResetPassword ? (
+            <>
+              <form onSubmit={handleAuth} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number (Optional)</Label>
+                  <Label htmlFor="password">Password</Label>
                   <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="+91 9876543210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={6}
                   />
                 </div>
-              </>
-            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
+                <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="mr-2 h-4 w-4" />
+                      Sign In
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-              />
-              {isSignUp && (
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 6 characters
-                </p>
-              )}
-            </div>
-
-            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={loading || isRedirecting}>
-              {(loading || isRedirecting) ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isRedirecting ? 'Redirecting...' : isSignUp ? 'Creating...' : 'Signing in...'}
-                </>
-              ) : (
-                <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  {isSignUp ? 'Create Account' : 'Sign In'}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </form>
-
-          {!isSignUp && !showResetPassword && (
-            <Button
-              type="button"
-              variant="link"
-              className="w-full text-sm text-orange-600 hover:text-orange-700"
-              onClick={() => setShowResetPassword(true)}
-              disabled={loading}
-            >
-              Forgot password?
-            </Button>
-          )}
-
-          {showResetPassword && (
-            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="link"
+                className="w-full text-sm text-orange-600 hover:text-orange-700"
+                onClick={() => setShowResetPassword(true)}
+                disabled={loading}
+              >
+                Forgot password?
+              </Button>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="reset-email">Email</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
               <Button
                 type="button"
                 className="w-full bg-orange-500 hover:bg-orange-600"
                 onClick={handleResetPassword}
                 disabled={loading}
               >
-                Send Reset Link
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Reset Link'
+                )}
               </Button>
               <Button
                 type="button"
@@ -313,48 +237,6 @@ export default function LoginPage() {
               </Button>
             </div>
           )}
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-muted-foreground">Or continue with</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-          >
-            <Chrome className="mr-2 h-4 w-4" />
-            Google
-          </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-full"
-            onClick={() => {
-              setIsSignUp(!isSignUp);
-              setPassword('');
-            }}
-            disabled={loading}
-          >
-            {isSignUp
-              ? 'Already have an account? Sign In'
-              : "Don't have an account? Sign Up"
-            }
-          </Button>
         </CardContent>
       </Card>
     </div>

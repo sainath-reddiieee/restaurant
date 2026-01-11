@@ -14,7 +14,6 @@ export default function PartnerLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -36,63 +35,44 @@ export default function PartnerLoginPage() {
       }
 
       if (data.user && data.session) {
-        toast({
-          title: 'Success',
-          description: 'Signed in successfully! Redirecting...',
-        });
+        const { supabase: supabaseClient } = await import('@/lib/supabase/client');
 
-        setIsRedirecting(true);
+        const { data: profile, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
 
-        try {
-          const { supabase: supabaseClient } = await import('@/lib/supabase/client');
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+        }
 
-          await new Promise(resolve => setTimeout(resolve, 2000));
-
-          const { data: { session: verifiedSession } } = await supabaseClient.auth.getSession();
-
-          if (!verifiedSession) {
-            throw new Error('Session not established');
-          }
-
-          const { data: profile, error: profileError } = await supabaseClient
-            .from('profiles')
-            .select('role')
-            .eq('id', data.user.id)
-            .maybeSingle();
-
-          if (profileError) {
-            console.error('Profile fetch error:', profileError);
-          }
-
-          if (profile?.role === 'CUSTOMER') {
-            toast({
-              title: 'Access Denied',
-              description: 'This portal is for restaurant partners and admins only.',
-              variant: 'destructive',
-            });
-            await supabaseClient.auth.signOut();
-            setLoading(false);
-            setIsRedirecting(false);
-            return;
-          }
-
-          if (profile?.role === 'SUPER_ADMIN') {
-            window.location.href = '/admin';
-          } else if (profile?.role === 'RESTAURANT') {
-            window.location.href = '/dashboard';
-          } else {
-            window.location.href = '/';
-          }
-        } catch (err) {
-          console.error('Post-login error:', err);
-          setIsRedirecting(false);
-          setLoading(false);
+        if (profile?.role === 'CUSTOMER') {
           toast({
-            title: 'Error',
-            description: 'Failed to complete login. Please try again.',
+            title: 'Access Denied',
+            description: 'This portal is for restaurant partners and admins only.',
             variant: 'destructive',
           });
+          await supabaseClient.auth.signOut();
+          setLoading(false);
+          return;
         }
+
+        toast({
+          title: 'Success',
+          description: 'Signed in successfully!',
+        });
+
+        let redirectPath = '/';
+        if (profile?.role === 'SUPER_ADMIN') {
+          redirectPath = '/admin';
+        } else if (profile?.role === 'RESTAURANT') {
+          redirectPath = '/dashboard';
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+        router.push(redirectPath);
+        router.refresh();
       }
     } catch (error) {
       toast({
@@ -158,12 +138,12 @@ export default function PartnerLoginPage() {
               <Button
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600"
-                disabled={loading || isRedirecting}
+                disabled={loading}
               >
-                {(loading || isRedirecting) ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isRedirecting ? 'Redirecting...' : 'Signing in...'}
+                    Signing in...
                   </>
                 ) : (
                   <>

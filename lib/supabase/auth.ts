@@ -9,29 +9,6 @@ export async function signInWithEmail(email: string, password: string) {
   return { data, error };
 }
 
-export async function signUpWithEmail(email: string, password: string, phone?: string, fullName?: string) {
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        phone: phone || '',
-        full_name: fullName || '',
-      },
-    },
-  });
-  return { data, error };
-}
-
-export async function signInWithGoogle() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/callback`,
-    },
-  });
-  return { data, error };
-}
 
 export async function signOut() {
   const { error } = await supabase.auth.signOut();
