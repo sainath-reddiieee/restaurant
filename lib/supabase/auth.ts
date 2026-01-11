@@ -1,28 +1,24 @@
 import { supabase } from './client';
 import type { UserRole } from './types';
 
-export async function signInWithPhone(phone: string) {
-  const { data, error } = await supabase.auth.signInWithOtp({
-    phone,
+export async function signInWithEmail(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
   });
   return { data, error };
 }
 
-export async function signInWithGoogle() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
+export async function signUpWithEmail(email: string, password: string, phone?: string, fullName?: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
     options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
+      data: {
+        phone: phone || '',
+        full_name: fullName || '',
+      },
     },
-  });
-  return { data, error };
-}
-
-export async function verifyOtp(phone: string, token: string) {
-  const { data, error } = await supabase.auth.verifyOtp({
-    phone,
-    token,
-    type: 'sms',
   });
   return { data, error };
 }

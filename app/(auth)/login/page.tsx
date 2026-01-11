@@ -6,32 +6,54 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { signInWithPhone, signInWithGoogle } from '@/lib/supabase/auth';
-import { Phone, Mail } from 'lucide-react';
+import { signInWithEmail, signUpWithEmail } from '@/lib/supabase/auth';
+import { Mail, ArrowRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   const [phone, setPhone] = useState('');
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
-  const handlePhoneLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const formattedPhone = phone.startsWith('+91') ? phone : `+91${phone}`;
-      const { error } = await signInWithPhone(formattedPhone);
+      if (isSignUp) {
+        const { error } = await signUpWithEmail(email, password, phone, fullName);
 
-      if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
+        if (error) {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Success',
+            description: 'Account created! Please sign in.',
+          });
+          setIsSignUp(false);
+          setPassword('');
+        }
       } else {
-        router.push(`/verify?phone=${encodeURIComponent(formattedPhone)}`);
+        const { error } = await signInWithEmail(email, password);
+
+        if (error) {
+          toast({
+            title: 'Error',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else {
+          router.push('/');
+        }
       }
     } catch (error) {
       toast({
@@ -44,59 +66,82 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
-      if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-        setLoading(false);
-      }
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome to Anantapur OS</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">
+            {isSignUp ? 'Create Account' : 'Welcome Back'}
+          </CardTitle>
           <CardDescription className="text-center">
-            Sign in to order delicious food from local restaurants
+            {isSignUp
+              ? 'Sign up to start ordering from local restaurants'
+              : 'Sign in to your Anantapur OS account'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handlePhoneLogin} className="space-y-4">
+          <form onSubmit={handleAuth} className="space-y-4">
+            {isSignUp && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="fullName">Full Name</Label>
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number (Optional)</Label>
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="+91 9876543210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="9876543210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  className="flex-1"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                We&apos;ll send you an OTP to verify your number
-              </p>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              <Phone className="mr-2 h-4 w-4" />
-              Continue with Phone
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+              {isSignUp && (
+                <p className="text-xs text-muted-foreground">
+                  Must be at least 6 characters
+                </p>
+              )}
+            </div>
+
+            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={loading}>
+              <Mail className="mr-2 h-4 w-4" />
+              {isSignUp ? 'Create Account' : 'Sign In'}
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
 
@@ -104,20 +149,22 @@ export default function LoginPage() {
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or</span>
-            </div>
           </div>
 
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             className="w-full"
-            onClick={handleGoogleLogin}
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setPassword('');
+            }}
             disabled={loading}
           >
-            <Mail className="mr-2 h-4 w-4" />
-            Continue with Google
+            {isSignUp
+              ? 'Already have an account? Sign In'
+              : "Don't have an account? Sign Up"
+            }
           </Button>
         </CardContent>
       </Card>
