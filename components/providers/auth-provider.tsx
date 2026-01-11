@@ -23,11 +23,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
     console.log('🔍 Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
 
+    // Debug: Check what auth.uid() returns
+    const { data: sessionCheck } = await supabase.auth.getSession();
+    console.log('🔐 Session check before query:', {
+      hasSession: !!sessionCheck.session,
+      sessionUserId: sessionCheck.session?.user?.id,
+      matchesQueryId: sessionCheck.session?.user?.id === userId,
+      tokenLength: sessionCheck.session?.access_token?.length
+    });
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
+
+    console.log('📊 Query result:', { hasData: !!data, hasError: !!error });
 
     // Check for RLS errors specifically - these indicate session token not attached yet
     if (error) {
