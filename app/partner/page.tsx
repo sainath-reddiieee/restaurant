@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail } from '@/lib/supabase/auth';
+import { supabase } from '@/lib/supabase/client';
 import { Store, ArrowLeft, Lock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,6 +17,33 @@ export default function PartnerLoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          switch (profile.role) {
+            case 'SUPER_ADMIN':
+              window.location.href = '/admin';
+              return;
+            case 'RESTAURANT':
+              window.location.href = '/dashboard';
+              return;
+            default:
+              window.location.href = '/';
+          }
+        }
+      }
+    };
+    checkSession();
+  }, []);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,8 +68,28 @@ export default function PartnerLoginPage() {
           description: 'Signed in successfully!',
         });
 
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        window.location.href = '/';
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        if (profile) {
+          switch (profile.role) {
+            case 'SUPER_ADMIN':
+              window.location.href = '/admin';
+              break;
+            case 'RESTAURANT':
+              window.location.href = '/dashboard';
+              break;
+            default:
+              window.location.href = '/';
+          }
+        } else {
+          window.location.href = '/';
+        }
       }
     } catch (error) {
       toast({
