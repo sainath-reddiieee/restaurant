@@ -49,41 +49,14 @@ export default function LoginPage() {
 
       console.log('Login successful:', data.user.id);
 
-      const { supabase: supabaseClient } = await import('@/lib/supabase/client');
-
-      const { data: profile, error: profileError } = await supabaseClient
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      if (profileError) {
-        console.error('Profile fetch error:', profileError);
-      }
-
-      let redirectPath = '/';
-      if (profile?.role) {
-        switch (profile.role) {
-          case 'SUPER_ADMIN':
-            redirectPath = '/admin';
-            break;
-          case 'RESTAURANT':
-            redirectPath = '/dashboard';
-            break;
-          default:
-            redirectPath = '/';
-            break;
-        }
-      }
-
       toast({
         title: 'Success',
         description: 'Signed in successfully!',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 500));
-      router.push(redirectPath);
-      router.refresh();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      window.location.href = '/';
     } catch (error) {
       console.error('Auth error:', error);
       toast({

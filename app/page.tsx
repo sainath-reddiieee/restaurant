@@ -124,7 +124,7 @@ export default function Home() {
       <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-6xl">
         <div className="mb-4 sm:mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">Order Food Nearby</h2>
-          <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4 animate-in fade-in delay-150 duration-700">Browse and order without login. Quick Google sign-in only at final checkout.</p>
+          <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4 animate-in fade-in delay-150 duration-700">Browse restaurants and add items to cart. Login only required at checkout.</p>
 
           <div className="relative animate-in fade-in slide-in-from-bottom-4 delay-300 duration-700">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 transition-colors" />

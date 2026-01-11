@@ -35,44 +35,13 @@ export default function PartnerLoginPage() {
       }
 
       if (data.user && data.session) {
-        const { supabase: supabaseClient } = await import('@/lib/supabase/client');
-
-        const { data: profile, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .maybeSingle();
-
-        if (profileError) {
-          console.error('Profile fetch error:', profileError);
-        }
-
-        if (profile?.role === 'CUSTOMER') {
-          toast({
-            title: 'Access Denied',
-            description: 'This portal is for restaurant partners and admins only.',
-            variant: 'destructive',
-          });
-          await supabaseClient.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
         toast({
           title: 'Success',
           description: 'Signed in successfully!',
         });
 
-        let redirectPath = '/';
-        if (profile?.role === 'SUPER_ADMIN') {
-          redirectPath = '/admin';
-        } else if (profile?.role === 'RESTAURANT') {
-          redirectPath = '/dashboard';
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-        router.push(redirectPath);
-        router.refresh();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        window.location.href = '/';
       }
     } catch (error) {
       toast({
