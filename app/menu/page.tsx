@@ -55,7 +55,7 @@ export default function MenuListPage() {
       <div className="bg-white border-b shadow-sm">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Anantapur OS</h1>
+            <h1 className="text-2xl font-bold text-gray-900">GO515</h1>
             <p className="text-sm text-gray-600">Discover local restaurants</p>
           </div>
           <Button variant="ghost" onClick={signOut}>Logout</Button>
@@ -76,7 +76,7 @@ export default function MenuListPage() {
                   <CardTitle className="text-xl">{restaurant.name}</CardTitle>
                   <CardDescription className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
-                    Anantapur
+                    GO515
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
