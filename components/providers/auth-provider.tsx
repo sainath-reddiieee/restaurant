@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, createClient } from '@supabase/supabase-js';
+import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import type { Profile } from '@/lib/supabase/types';
 
@@ -22,24 +22,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string, accessToken?: string, retryCount = 0): Promise<void> => {
     console.log('🔍 Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
-    console.log('🔐 Access token provided:', !!accessToken, 'Length:', accessToken?.length);
 
-    // Create a properly configured client with the session token
-    const client = accessToken
-      ? createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          {
-            global: {
-              headers: {
-                Authorization: `Bearer ${accessToken}`
-              }
-            }
-          }
-        )
-      : supabase;
-
-    const { data, error } = await client
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
