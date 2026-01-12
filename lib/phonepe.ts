@@ -152,6 +152,18 @@ export async function initiatePhonePePayment(
     });
 
     // Make API call to PhonePe
+    const requestBody = { request: payload };
+
+    console.log('=== PhonePe Request Debug ===', {
+      url: `${config.hostUrl}/pg/v1/pay`,
+      merchantId: config.merchantId,
+      transactionId,
+      amount: amountInPaise,
+      mobileNumber: formattedMobile,
+      checksumPreview: checksum.substring(0, 20) + '...',
+      payloadPreview: payload.substring(0, 50) + '...',
+    });
+
     const response = await fetch(`${config.hostUrl}/pg/v1/pay`, {
       method: 'POST',
       headers: {
@@ -159,12 +171,22 @@ export async function initiatePhonePePayment(
         'X-VERIFY': checksum,
         'accept': 'application/json',
       },
-      body: JSON.stringify({
-        request: payload,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
-    const result: PhonePePaymentResponse = await response.json();
+    const responseText = await response.text();
+    console.log('PhonePe Raw Response:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText,
+    });
+
+    let result: PhonePePaymentResponse;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      throw new Error(`Invalid JSON response from PhonePe: ${responseText}`);
+    }
 
     console.log('PhonePe API Response:', {
       success: result.success,
