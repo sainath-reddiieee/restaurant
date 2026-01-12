@@ -61,14 +61,12 @@ export async function POST(req: NextRequest) {
         }, { status: 404 });
       }
 
-      const newStatus = status === 'success' ? 'paid' : 'failed';
-      const paymentStatus = status === 'success' ? 'completed' : 'failed';
+      const newStatus = status === 'success' ? 'CONFIRMED' : 'PENDING';
 
       const { error: updateError } = await supabase
         .from('orders')
         .update({
           status: newStatus,
-          payment_status: paymentStatus,
           payment_merchant_transaction_id: merchantTransactionId,
           updated_at: new Date().toISOString()
         })
