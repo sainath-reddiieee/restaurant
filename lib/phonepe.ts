@@ -157,7 +157,6 @@ export async function initiatePhonePePayment(
       headers: {
         'Content-Type': 'application/json',
         'X-VERIFY': checksum,
-        'X-MERCHANT-ID': config.merchantId,
         'accept': 'application/json',
       },
       body: JSON.stringify({
@@ -171,6 +170,8 @@ export async function initiatePhonePePayment(
       success: result.success,
       code: result.code,
       message: result.message,
+      httpStatus: response.status,
+      fullResponse: JSON.stringify(result),
     });
 
     if (result.success && result.data?.instrumentResponse?.redirectInfo?.url) {
