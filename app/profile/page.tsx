@@ -70,6 +70,15 @@ export default function ProfilePage() {
 
       if (profileData) {
         setProfile(profileData);
+
+        // Redirect to appropriate dashboard based on role
+        if (profileData.role === 'SUPER_ADMIN') {
+          router.push('/admin');
+          return;
+        } else if (profileData.role === 'RESTAURANT') {
+          router.push('/dashboard');
+          return;
+        }
       }
 
       const { data: ordersData } = await supabase
@@ -171,7 +180,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <Badge variant="secondary" className="self-start">
-                  Student
+                  {profile.role === 'CUSTOMER' || profile.role === 'STUDENT' ? 'Customer' : profile.role}
                 </Badge>
               </div>
             </CardContent>
@@ -199,9 +208,11 @@ export default function ProfilePage() {
                 <p className="text-sm text-blue-900 leading-relaxed">
                   <strong>How does the wallet work?</strong>
                   <br />
-                  Your wallet balance can be used to reduce payment amounts at checkout.
-                  Money is added to your wallet through order refunds and platform rewards only.
-                  You cannot directly add money to your wallet.
+                  {profile.role === 'RESTAURANT' ? (
+                    <>Your wallet contains earnings from completed orders. Payment settlements and withdrawals can be managed from your partner dashboard.</>
+                  ) : (
+                    <>Your wallet balance can be used to reduce payment amounts at checkout. Money is added to your wallet through order refunds and platform rewards only. You cannot directly add money to your wallet.</>
+                  )}
                 </p>
               </div>
             </CardContent>
