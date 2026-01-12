@@ -213,7 +213,60 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="border-t border-gray-200 mt-8 sm:mt-12 py-6 sm:py-8 bg-white animate-in fade-in slide-in-from-bottom-4 delay-700">
+      <section className="mt-8 sm:mt-12 bg-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg border border-gray-100 animate-in fade-in slide-in-from-bottom-4 delay-600">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">About Anantapur OS</h2>
+        <div className="grid md:grid-cols-2 gap-6 sm:gap-8 text-sm sm:text-base">
+          <div>
+            <p className="text-gray-700 leading-relaxed mb-4">
+              Anantapur is a hyperlocal food delivery platform designed specifically for tier-2 and tier-3 cities. We connect local restaurants with customers through a seamless digital storefront experience.
+            </p>
+            <p className="text-gray-700 leading-relaxed">
+              Our platform features innovative Late Night Loot Mode for flash sales, guest checkout for convenience, and powerful restaurant management tools.
+            </p>
+          </div>
+          <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 sm:p-6">
+            <h3 className="font-bold text-lg sm:text-xl text-gray-900 mb-3 sm:mb-4">Key Features</h3>
+            <ul className="space-y-2 text-gray-700">
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                <span>Browse without login, checkout as guest</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                <span>Late Night Loot Mode for flash sales</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                <span>Real-time order tracking</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-orange-500 mt-1">•</span>
+                <span>Multiple payment options</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 sm:mt-8 bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg animate-in fade-in slide-in-from-bottom-4 delay-700">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Contact Us</h2>
+        <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 text-sm sm:text-base">
+          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+            <h3 className="font-semibold mb-2 text-orange-400">Phone</h3>
+            <p className="text-white/90">+91 9441414140</p>
+          </div>
+          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+            <h3 className="font-semibold mb-2 text-orange-400">Email</h3>
+            <p className="text-white/90">support@anantapur.local</p>
+          </div>
+          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
+            <h3 className="font-semibold mb-2 text-orange-400">Location</h3>
+            <p className="text-white/90">Anantapur, Andhra Pradesh</p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-gray-200 mt-8 sm:mt-12 py-6 sm:py-8 bg-white animate-in fade-in slide-in-from-bottom-4 delay-800">
         <div className="container mx-auto px-3 sm:px-4 text-center text-xs sm:text-sm text-gray-600">
           {!user && (
             <p className="mb-2">Restaurant Partner? <button onClick={() => router.push('/partner')} className="text-orange-600 hover:underline font-medium hover:text-orange-700 transition-colors duration-300">Login here</button></p>

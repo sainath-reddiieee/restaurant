@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Loader2, ShoppingCart, Plus, Minus, Zap, Gift, ArrowLeft } from 'lucide-react';
+import { Loader2, ShoppingCart, Plus, Minus, Zap, Gift, ArrowLeft, Star, Leaf } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 import Link from 'next/link';
@@ -24,6 +24,7 @@ export default function RestaurantMenuPage() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [vegFilter, setVegFilter] = useState<'all' | 'veg' | 'non-veg'>('all');
 
   const slug = params.slug as string;
 
@@ -159,8 +160,15 @@ export default function RestaurantMenuPage() {
     return null;
   }
 
-  const lootItems = menuItems.filter(item => item.is_clearance);
-  const regularItems = menuItems.filter(item => !item.is_clearance);
+  const filterByVeg = (items: MenuItem[]) => {
+    if (vegFilter === 'veg') return items.filter(item => item.is_veg);
+    if (vegFilter === 'non-veg') return items.filter(item => !item.is_veg);
+    return items;
+  };
+
+  const filteredMenuItems = filterByVeg(menuItems);
+  const lootItems = filteredMenuItems.filter(item => item.is_clearance);
+  const regularItems = filteredMenuItems.filter(item => !item.is_clearance);
   const categories = Array.from(new Set(regularItems.map(item => item.category)));
   const deliveryInfo = getDeliveryInfo();
 
@@ -173,6 +181,15 @@ export default function RestaurantMenuPage() {
             Back to Restaurants
           </Link>
           <h1 className="text-3xl font-bold">{restaurant.name}</h1>
+          {restaurant.rating_count > 0 && (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-semibold">{restaurant.rating_avg}</span>
+              </div>
+              <span className="text-white/80 text-sm">({restaurant.rating_count} reviews)</span>
+            </div>
+          )}
           {deliveryInfo && (
             <p className="mt-2 text-white/90">{deliveryInfo.message}</p>
           )}
@@ -180,6 +197,34 @@ export default function RestaurantMenuPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-4xl">
+        <div className="flex items-center gap-2 mb-6 bg-white rounded-lg p-2 shadow-sm">
+          <Button
+            variant={vegFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setVegFilter('all')}
+            className={vegFilter === 'all' ? 'bg-orange-600 hover:bg-orange-700' : ''}
+          >
+            All Items
+          </Button>
+          <Button
+            variant={vegFilter === 'veg' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setVegFilter('veg')}
+            className={vegFilter === 'veg' ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            <Leaf className="h-4 w-4 mr-1" />
+            Veg Only
+          </Button>
+          <Button
+            variant={vegFilter === 'non-veg' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setVegFilter('non-veg')}
+            className={vegFilter === 'non-veg' ? 'bg-red-600 hover:bg-red-700' : ''}
+          >
+            Non-Veg
+          </Button>
+        </div>
+
         {lootItems.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">

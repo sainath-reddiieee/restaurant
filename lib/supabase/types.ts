@@ -22,6 +22,9 @@ export interface Restaurant {
   free_delivery_threshold: number | null;
   slug: string;
   created_at: string;
+  image_url: string | null;
+  rating_avg: number;
+  rating_count: number;
 }
 
 export interface MenuItem {
@@ -37,6 +40,7 @@ export interface MenuItem {
   is_mystery: boolean;
   mystery_type: MysteryType | null;
   is_available: boolean;
+  is_veg: boolean;
   created_at: string;
 }
 
@@ -75,6 +79,16 @@ export interface Order {
   items: OrderItem[];
   created_at: string;
   updated_at: string;
+}
+
+export interface Review {
+  id: string;
+  restaurant_id: string;
+  customer_id: string;
+  order_id: string | null;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
 }
 
 export interface Database {
