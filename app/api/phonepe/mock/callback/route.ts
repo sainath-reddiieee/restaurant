@@ -62,9 +62,13 @@ export async function POST(req: NextRequest) {
     }
     // Handle wallet recharge
     else if (merchantTransactionId.startsWith('RECHARGE-')) {
-      // Extract transaction ID from RECHARGE-{txnId}-{timestamp}
+      // Extract transaction ID from RECHARGE-{uuid}-{timestamp}
+      // Format: RECHARGE-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx-timestamp
+      // UUID has 5 parts, so we need parts[1] through parts[5]
       const parts = merchantTransactionId.split('-');
-      const walletTxnId = parts[1];
+      const walletTxnId = parts.slice(1, 6).join('-'); // Reconstruct UUID from parts
+
+      console.log('[Mock Callback] Extracted wallet transaction ID:', walletTxnId);
 
       // Look up the wallet transaction record
       const { data: walletTxn, error: walletTxnError } = await supabase

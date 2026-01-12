@@ -66,9 +66,13 @@ export async function GET(request: NextRequest) {
           });
         }
       } else if (txnId.startsWith('RECHARGE-')) {
-        // Extract transaction ID from RECHARGE-{txnId}-{timestamp}
+        // Extract transaction ID from RECHARGE-{uuid}-{timestamp}
+        // Format: RECHARGE-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx-timestamp
+        // UUID has 5 parts, so we need parts[1] through parts[5]
         const parts = txnId.split('-');
-        const walletTxnId = parts[1];
+        const walletTxnId = parts.slice(1, 6).join('-'); // Reconstruct UUID from parts
+
+        console.log('[Mock Verify] Extracted wallet transaction ID:', walletTxnId);
 
         const { data: transaction, error } = await supabase
           .from('wallet_transactions')
