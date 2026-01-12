@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, DollarSign, Package, Clock, CheckCircle, ChefHat, Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Loader2, DollarSign, Package, Clock, CheckCircle, ChefHat, Wallet, AlertTriangle, RefreshCw, User } from 'lucide-react';
 import { formatPrice, generateWhatsAppMessage, generateWhatsAppLink } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -264,6 +264,12 @@ export default function RestaurantDashboard() {
             </Link>
             <Link href="/dashboard/coupons">
               <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">Coupons</Button>
+            </Link>
+            <Link href="/profile">
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
+                <User className="h-4 w-4 mr-2" />
+                Profile
+              </Button>
             </Link>
             <Button className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm" onClick={signOut}>Logout</Button>
           </div>

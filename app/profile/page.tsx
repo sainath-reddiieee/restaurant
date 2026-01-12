@@ -18,7 +18,8 @@ import {
   HeadphonesIcon,
   LogOut,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Package
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
@@ -70,15 +71,6 @@ export default function ProfilePage() {
 
       if (profileData) {
         setProfile(profileData);
-
-        // Redirect to appropriate dashboard based on role
-        if (profileData.role === 'SUPER_ADMIN') {
-          router.push('/admin');
-          return;
-        } else if (profileData.role === 'RESTAURANT') {
-          router.push('/dashboard');
-          return;
-        }
       }
 
       const { data: ordersData } = await supabase
@@ -190,10 +182,14 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
-                Vello Wallet
+                {profile.role === 'RESTAURANT' ? 'Partner Wallet' : profile.role === 'SUPER_ADMIN' ? 'Admin Wallet' : 'Vello Wallet'}
               </CardTitle>
               <CardDescription>
-                Your wallet balance for refunds and rewards
+                {profile.role === 'RESTAURANT'
+                  ? 'Your restaurant earnings and balance'
+                  : profile.role === 'SUPER_ADMIN'
+                  ? 'Admin account wallet balance'
+                  : 'Your wallet balance for refunds and rewards'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -223,18 +219,74 @@ export default function ProfilePage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-between hover:bg-slate-100"
-                onClick={() => setShowOrders(!showOrders)}
-              >
-                <span className="flex items-center gap-3">
-                  <History className="h-5 w-5" />
-                  Order History
-                  <Badge variant="secondary">{orders.length}</Badge>
-                </span>
-                <ChevronRight className={`h-5 w-5 transition-transform ${showOrders ? 'rotate-90' : ''}`} />
-              </Button>
+              {profile.role === 'RESTAURANT' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Package className="h-5 w-5" />
+                      Restaurant Dashboard
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/partner/wallet')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Wallet className="h-5 w-5" />
+                      Wallet & Transactions
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Separator />
+                </>
+              )}
+              {profile.role === 'SUPER_ADMIN' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/admin')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Package className="h-5 w-5" />
+                      Admin Dashboard
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/admin/finance')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Wallet className="h-5 w-5" />
+                      Finance Management
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Separator />
+                </>
+              )}
+              {(profile.role === 'CUSTOMER' || profile.role === 'STUDENT') && (
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between hover:bg-slate-100"
+                  onClick={() => setShowOrders(!showOrders)}
+                >
+                  <span className="flex items-center gap-3">
+                    <History className="h-5 w-5" />
+                    Order History
+                    <Badge variant="secondary">{orders.length}</Badge>
+                  </span>
+                  <ChevronRight className={`h-5 w-5 transition-transform ${showOrders ? 'rotate-90' : ''}`} />
+                </Button>
+              )}
 
               {showOrders && (
                 <ScrollArea className="h-[300px] w-full rounded-md border p-4">
