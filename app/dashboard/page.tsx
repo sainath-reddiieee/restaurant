@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, DollarSign, Package, Clock, CheckCircle, ChefHat, Wallet, AlertTriangle } from 'lucide-react';
+import { Loader2, DollarSign, Package, Clock, CheckCircle, ChefHat, Wallet, AlertTriangle, RefreshCw } from 'lucide-react';
 import { formatPrice, generateWhatsAppMessage, generateWhatsAppLink } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -21,6 +21,7 @@ export default function RestaurantDashboard() {
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [totalSales, setTotalSales] = useState(0);
 
   // FIX: Proper authentication check with redirect to login or homepage
@@ -67,6 +68,21 @@ export default function RestaurantDashboard() {
       setRestaurant(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchRestaurant();
+      toast({
+        title: 'Refreshed',
+        description: 'Dashboard data updated',
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -226,6 +242,14 @@ export default function RestaurantDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
             <Link href="/partner/wallet">
               <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
                 <Wallet className="h-4 w-4 mr-2" />
@@ -297,16 +321,6 @@ export default function RestaurantDashboard() {
             <CardContent>
               <div className="text-3xl font-bold">{formatPrice(restaurant.credit_balance)}</div>
               <p className="text-xs text-white/80">Tech fee: ₹{restaurant.tech_fee}/order</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-emerald-500 to-green-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-white">Total Sales</CardTitle>
-              <DollarSign className="h-5 w-5 text-emerald-100" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{formatPrice(totalSales)}</div>
-              <p className="text-xs text-emerald-100">Revenue before delivery fees</p>
             </CardContent>
           </Card>
           <Card className="bg-gradient-to-br from-emerald-500 to-green-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">

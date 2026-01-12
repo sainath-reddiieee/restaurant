@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet } from 'lucide-react';
+import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
@@ -25,6 +25,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
@@ -87,6 +88,22 @@ export default function AdminDashboard() {
 
     if (count !== null) {
       setTotalOrders(count);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchRestaurants();
+      await fetchStats();
+      toast({
+        title: 'Refreshed',
+        description: 'Dashboard data updated',
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -221,6 +238,14 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
               <Link href="/admin/finance">
                 <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
                   <Wallet className="h-4 w-4 mr-2" />

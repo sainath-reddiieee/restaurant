@@ -23,7 +23,7 @@ export default function CheckoutPage() {
   const params = useParams();
   const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
-  const { items: cartItems, cartTotal, clearCart } = useCart();
+  const { items: cartItems, cartTotal, clearCart, isInitialized: cartInitialized } = useCart();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +43,8 @@ export default function CheckoutPage() {
   const slug = params.slug as string;
 
   useEffect(() => {
+    if (!cartInitialized) return;
+
     if (cartItems.length === 0) {
       toast({
         title: 'Cart is empty',
@@ -60,7 +62,7 @@ export default function CheckoutPage() {
         fetchWalletBalance();
       }
     }
-  }, [slug, cartItems.length, authLoading, profile]);
+  }, [slug, cartItems.length, authLoading, profile, cartInitialized]);
 
   const fetchWalletBalance = async () => {
     if (!profile) return;

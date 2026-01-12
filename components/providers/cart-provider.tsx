@@ -15,12 +15,14 @@ interface CartContextType {
   clearCart: () => void;
   cartTotal: number;
   itemCount: number;
+  isInitialized: boolean;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('cart');
@@ -31,6 +33,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         console.error('Failed to parse cart from localStorage', e);
       }
     }
+    setIsInitialized(true);
   }, []);
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   return (
     <CartContext.Provider
-      value={{ items, addItem, removeItem, updateQuantity, clearCart, cartTotal, itemCount }}
+      value={{ items, addItem, removeItem, updateQuantity, clearCart, cartTotal, itemCount, isInitialized }}
     >
       {children}
     </CartContext.Provider>
