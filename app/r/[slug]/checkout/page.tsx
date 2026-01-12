@@ -314,29 +314,42 @@ export default function CheckoutPage() {
       });
 
       if (paymentMethod === 'PREPAID_UPI' && gstBreakdown.amountToPay > 0) {
-        const upiLink = generateUPIDeepLink(
-          restaurant.upi_id,
-          restaurant.name,
-          gstBreakdown.amountToPay,
-          order.short_id
-        );
+        // Initiate PhonePe payment
+        try {
+          const phoneNumber = profile?.phone || guestPhone;
+          const transactionId = `ORDER-${order.id}-${Date.now()}`;
 
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          const response = await fetch('/api/phonepe/initiate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              amount: gstBreakdown.amountToPay,
+              transactionId,
+              mobileNumber: phoneNumber,
+              userId: customerId,
+              type: 'ORDER',
+            }),
+          });
 
-        if (isMobile) {
-          setTimeout(() => {
-            window.location.href = upiLink;
-          }, 1000);
-        } else {
-          localStorage.setItem('pending_payment', JSON.stringify({
-            orderId: order.id,
-            upiLink,
-            amount: gstBreakdown.amountToPay,
-            restaurantUPI: restaurant.upi_id,
-            restaurantName: restaurant.name,
-            orderShortId: order.short_id
-          }));
-          router.push(`/orders/${order.id}`);
+          const data = await response.json();
+
+          if (data.success && data.redirectUrl) {
+            // Redirect to PhonePe payment page
+            window.location.href = data.redirectUrl;
+          } else {
+            throw new Error(data.error || 'Failed to initiate payment');
+          }
+        } catch (paymentError) {
+          console.error('Payment initiation error:', paymentError);
+          toast({
+            title: 'Payment Error',
+            description: paymentError instanceof Error ? paymentError.message : 'Failed to initiate payment. Please try again.',
+            variant: 'destructive',
+          });
+          setSubmitting(false);
+          return;
         }
       } else {
         router.push(`/orders/${order.id}`);

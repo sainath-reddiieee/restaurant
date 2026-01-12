@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet, RefreshCw, Pencil } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
@@ -27,6 +27,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingRestaurantId, setEditingRestaurantId] = useState<string | null>(null);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
 
@@ -38,6 +40,7 @@ export default function AdminDashboard() {
     delivery_fee: 40,
     free_delivery_threshold: '',
     slug: '',
+    is_active: true,
   });
 
   // FIX: Proper authentication check with redirect to login or homepage
@@ -107,10 +110,42 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleOpenCreateDialog = () => {
+    setEditMode(false);
+    setEditingRestaurantId(null);
+    setFormData({
+      name: '',
+      owner_phone: '',
+      upi_id: '',
+      tech_fee: 10,
+      delivery_fee: 40,
+      free_delivery_threshold: '',
+      slug: '',
+      is_active: true,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (restaurant: Restaurant) => {
+    setEditMode(true);
+    setEditingRestaurantId(restaurant.id);
+    setFormData({
+      name: restaurant.name,
+      owner_phone: restaurant.owner_phone,
+      upi_id: restaurant.upi_id,
+      tech_fee: restaurant.tech_fee,
+      delivery_fee: restaurant.delivery_fee,
+      free_delivery_threshold: restaurant.free_delivery_threshold?.toString() || '',
+      slug: restaurant.slug,
+      is_active: restaurant.is_active,
+    });
+    setDialogOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const insertData = {
+    const dataToSave = {
       name: formData.name,
       owner_phone: formData.owner_phone.startsWith('+91') ? formData.owner_phone : `+91${formData.owner_phone}`,
       upi_id: formData.upi_id,
@@ -118,15 +153,27 @@ export default function AdminDashboard() {
       delivery_fee: formData.delivery_fee,
       free_delivery_threshold: formData.free_delivery_threshold ? parseInt(formData.free_delivery_threshold) : null,
       slug: formData.slug,
-      is_active: true,
+      is_active: formData.is_active,
     };
 
-    // @ts-ignore
-    const { data, error } = await supabase
-      .from('restaurants')
-      .insert(insertData)
-      .select()
-      .single();
+    let error;
+
+    if (editMode && editingRestaurantId) {
+      // Update existing restaurant
+      const result = await supabase
+        .from('restaurants')
+        .update(dataToSave)
+        .eq('id', editingRestaurantId);
+      error = result.error;
+    } else {
+      // Create new restaurant
+      const result = await supabase
+        .from('restaurants')
+        .insert(dataToSave)
+        .select()
+        .single();
+      error = result.error;
+    }
 
     if (error) {
       toast({
@@ -137,9 +184,11 @@ export default function AdminDashboard() {
     } else {
       toast({
         title: 'Success',
-        description: 'Restaurant onboarded successfully!',
+        description: editMode ? 'Restaurant updated successfully!' : 'Restaurant onboarded successfully!',
       });
       setDialogOpen(false);
+      setEditMode(false);
+      setEditingRestaurantId(null);
       setFormData({
         name: '',
         owner_phone: '',
@@ -148,6 +197,7 @@ export default function AdminDashboard() {
         delivery_fee: 40,
         free_delivery_threshold: '',
         slug: '',
+        is_active: true,
       });
       fetchRestaurants();
       fetchStats();
@@ -272,18 +322,20 @@ export default function AdminDashboard() {
         <div className="flex justify-between items-center mb-8">
           <div>
           </div>
+          <Button
+            onClick={handleOpenCreateDialog}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Onboard Restaurant
+          </Button>
+
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg">
-                <Plus className="mr-2 h-4 w-4" />
-                Onboard Restaurant
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Onboard New Restaurant</DialogTitle>
+                <DialogTitle>{editMode ? 'Edit Restaurant' : 'Onboard New Restaurant'}</DialogTitle>
                 <DialogDescription>
-                  Add a new restaurant to the platform with custom configuration
+                  {editMode ? 'Update restaurant details and configuration' : 'Add a new restaurant to the platform with custom configuration'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -448,12 +500,21 @@ export default function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-900/20">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEditDialog(restaurant)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-900/20">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Restaurant</AlertDialogTitle>
@@ -472,6 +533,7 @@ export default function AdminDashboard() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

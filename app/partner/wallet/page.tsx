@@ -76,7 +76,7 @@ export default function PartnerWalletPage() {
 
   const handleRecharge = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!restaurant) return;
+    if (!restaurant || !profile) return;
 
     const amount = parseInt(rechargeAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -88,59 +88,73 @@ export default function PartnerWalletPage() {
       return;
     }
 
+    if (amount < 100) {
+      toast({
+        title: 'Minimum Amount',
+        description: 'Minimum recharge amount is ₹100',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      let proofUrl = null;
-
-      if (proofImage) {
-        const fileExt = proofImage.name.split('.').pop();
-        const fileName = `${restaurant.id}/${Date.now()}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('payment-proofs')
-          .upload(fileName, proofImage);
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from('payment-proofs')
-          .getPublicUrl(fileName);
-
-        proofUrl = publicUrl;
-      }
-
-      const { error } = await supabase
+      // Create wallet transaction record first
+      const { data: transaction, error: txnError } = await supabase
         .from('wallet_transactions')
         .insert({
           restaurant_id: restaurant.id,
           amount,
           type: 'WALLET_RECHARGE',
           status: 'PENDING',
-          proof_image_url: proofUrl,
-          notes,
-        });
+          notes: notes || 'PhonePe payment gateway recharge',
+        })
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (txnError || !transaction) {
+        throw new Error('Failed to create transaction record');
+      }
 
-      toast({
-        title: 'Recharge Request Submitted',
-        description: 'Your recharge request has been submitted for admin approval',
+      // Initiate PhonePe payment
+      const transactionId = `RECHARGE-${transaction.id}-${Date.now()}`;
+
+      const response = await fetch('/api/phonepe/initiate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount,
+          transactionId,
+          mobileNumber: profile.phone,
+          userId: profile.id,
+          type: 'RECHARGE',
+        }),
       });
 
-      setRechargeDialogOpen(false);
-      setRechargeAmount('');
-      setProofImage(null);
-      setNotes('');
-      fetchData();
+      const data = await response.json();
+
+      if (data.success && data.redirectUrl) {
+        // Redirect to PhonePe payment page
+        window.location.href = data.redirectUrl;
+      } else {
+        // Delete the transaction if payment initiation failed
+        await supabase
+          .from('wallet_transactions')
+          .delete()
+          .eq('id', transaction.id);
+
+        throw new Error(data.error || 'Failed to initiate payment');
+      }
     } catch (error) {
-      console.error('Error submitting recharge:', error);
+      console.error('Error initiating recharge:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to submit recharge request',
+        title: 'Recharge Failed',
+        description: error instanceof Error ? error.message : 'Failed to initiate recharge. Please try again.',
         variant: 'destructive',
       });
-    } finally {
       setSubmitting(false);
     }
   };
@@ -224,44 +238,48 @@ export default function PartnerWalletPage() {
                     <DialogHeader>
                       <DialogTitle>Recharge Wallet</DialogTitle>
                       <DialogDescription>
-                        Submit a recharge request with payment proof
+                        Pay securely using PhonePe Payment Gateway
                       </DialogDescription>
                     </DialogHeader>
                     <form onSubmit={handleRecharge} className="space-y-4">
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Wallet className="h-5 w-5 text-blue-600" />
+                          <h4 className="font-semibold text-blue-900">Instant Recharge</h4>
+                        </div>
+                        <p className="text-sm text-blue-700">
+                          Your wallet will be recharged instantly after successful payment via PhonePe.
+                          Minimum recharge: ₹100
+                        </p>
+                      </div>
+
                       <div>
-                        <Label htmlFor="amount">Amount (₹)</Label>
+                        <Label htmlFor="amount">Recharge Amount (₹)</Label>
                         <Input
                           id="amount"
                           type="number"
                           value={rechargeAmount}
                           onChange={(e) => setRechargeAmount(e.target.value)}
-                          placeholder="Enter amount"
+                          placeholder="Enter amount (min ₹100)"
                           required
-                          min="1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="proof">Payment Proof (Optional)</Label>
-                        <Input
-                          id="proof"
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => setProofImage(e.target.files?.[0] || null)}
+                          min="100"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Upload screenshot of payment to admin
+                          Minimum: ₹100 | Maximum: ₹1,00,000
                         </p>
                       </div>
+
                       <div>
                         <Label htmlFor="notes">Notes (Optional)</Label>
                         <Textarea
                           id="notes"
                           value={notes}
                           onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Add any additional notes..."
-                          rows={3}
+                          placeholder="Add reference or notes..."
+                          rows={2}
                         />
                       </div>
+
                       <Button
                         type="submit"
                         className="w-full bg-orange-600 hover:bg-orange-700"
@@ -270,12 +288,18 @@ export default function PartnerWalletPage() {
                         {submitting ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Submitting...
+                            Processing...
                           </>
                         ) : (
-                          'Submit Request'
+                          <>
+                            Proceed to Pay ₹{rechargeAmount || '0'}
+                          </>
                         )}
                       </Button>
+
+                      <p className="text-xs text-center text-gray-500">
+                        Powered by PhonePe Payment Gateway (Secure)
+                      </p>
                     </form>
                   </DialogContent>
                 </Dialog>
