@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
     // Update order status based on payment result
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       // Look up the wallet transaction record
       const { data: walletTxn, error: walletTxnError } = await supabase
         .from('wallet_transactions')
-        .select('user_id, amount, id')
+        .select('restaurant_id, amount, id')
         .eq('id', walletTxnId)
         .maybeSingle();
 
@@ -76,44 +76,42 @@ export async function POST(req: NextRequest) {
         throw walletTxnError || new Error('Wallet transaction not found');
       }
 
-      const userId = walletTxn.user_id;
+      const restaurantId = walletTxn.restaurant_id;
       const rechargeAmount = walletTxn.amount;
 
       if (status === 'success') {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('wallet_balance')
-          .eq('id', userId)
+        const { data: restaurant, error: restaurantError } = await supabase
+          .from('restaurants')
+          .select('credit_balance')
+          .eq('id', restaurantId)
           .maybeSingle();
 
-        if (profileError) {
-          console.error('[Mock Callback] Error fetching profile:', profileError);
-          throw profileError;
+        if (restaurantError) {
+          console.error('[Mock Callback] Error fetching restaurant:', restaurantError);
+          throw restaurantError;
         }
 
-        const currentBalance = profile?.wallet_balance || 0;
+        const currentBalance = restaurant?.credit_balance || 0;
         const newBalance = currentBalance + rechargeAmount;
 
         const { error: updateError } = await supabase
-          .from('profiles')
+          .from('restaurants')
           .update({
-            wallet_balance: newBalance,
-            updated_at: new Date().toISOString()
+            credit_balance: newBalance
           })
-          .eq('id', userId);
+          .eq('id', restaurantId);
 
         if (updateError) {
-          console.error('[Mock Callback] Error updating wallet:', updateError);
+          console.error('[Mock Callback] Error updating restaurant wallet:', updateError);
           throw updateError;
         }
 
-        // Update wallet transaction status
+        // Update wallet transaction status to APPROVED
         const { error: txUpdateError } = await supabase
           .from('wallet_transactions')
           .update({
-            status: 'COMPLETED',
-            payment_transaction_id: merchantTransactionId,
-            updated_at: new Date().toISOString()
+            status: 'APPROVED',
+            payment_transaction_id: merchantTransactionId
           })
           .eq('id', walletTxnId);
 
@@ -121,15 +119,14 @@ export async function POST(req: NextRequest) {
           console.error('[Mock Callback] Error updating wallet transaction:', txUpdateError);
         }
 
-        console.log('[Mock Callback] Wallet credited:', userId, 'Amount:', rechargeAmount);
+        console.log('[Mock Callback] Restaurant wallet credited:', restaurantId, 'Amount:', rechargeAmount);
       } else {
-        // Mark transaction as failed
+        // Mark transaction as rejected
         const { error: txUpdateError } = await supabase
           .from('wallet_transactions')
           .update({
-            status: 'FAILED',
-            payment_transaction_id: merchantTransactionId,
-            updated_at: new Date().toISOString()
+            status: 'REJECTED',
+            payment_transaction_id: merchantTransactionId
           })
           .eq('id', walletTxnId);
 
