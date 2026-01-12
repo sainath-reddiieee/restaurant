@@ -3,22 +3,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
-  console.log('[Mock Callback] Starting callback processing...');
+  console.log('[Mock Callback V3] Starting callback processing...');
   try {
+    console.log('[Mock Callback V3] Step 1: Parsing request body...');
     const body = await req.json();
     const { merchantTransactionId, status, amount } = body;
 
-    console.log('[Mock PhonePe Callback] Received:', {
+    console.log('[Mock Callback V3] Step 2: Request parsed successfully:', {
       merchantTransactionId,
       status,
       amount,
       timestamp: new Date().toISOString()
     });
 
+    console.log('[Mock Callback V3] Step 3: Creating Supabase client...');
+    console.log('[Mock Callback V3] SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'SET' : 'MISSING');
+    console.log('[Mock Callback V3] SERVICE_ROLE_KEY:', process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'MISSING');
+
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
+
+    console.log('[Mock Callback V3] Step 4: Supabase client created successfully');
 
     // Update order status based on payment result
     if (merchantTransactionId.startsWith('order_')) {
@@ -63,16 +70,19 @@ export async function POST(req: NextRequest) {
     }
     // Handle wallet recharge
     else if (merchantTransactionId.startsWith('RECHARGE-')) {
+      console.log('[Mock Callback V3] Step 5: Processing wallet recharge...');
+
       // Extract transaction ID from RECHARGE-{uuid}-{timestamp}
       // Format: RECHARGE-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx-timestamp
       // UUID has 5 parts, so we need parts[1] through parts[5]
       const parts = merchantTransactionId.split('-');
       const walletTxnId = parts.slice(1, 6).join('-'); // Reconstruct UUID from parts
 
-      console.log('[Mock Callback V2 - CODE UPDATED] Full transaction ID:', merchantTransactionId);
-      console.log('[Mock Callback V2 - CODE UPDATED] Parts after split:', parts);
-      console.log('[Mock Callback V2 - CODE UPDATED] Extracted wallet transaction ID:', walletTxnId);
+      console.log('[Mock Callback V3] Full transaction ID:', merchantTransactionId);
+      console.log('[Mock Callback V3] Parts after split:', parts);
+      console.log('[Mock Callback V3] Extracted wallet transaction ID:', walletTxnId);
 
+      console.log('[Mock Callback V3] Step 6: Querying wallet transaction from database...');
       // Look up the wallet transaction record
       const { data: walletTxn, error: walletTxnError } = await supabase
         .from('wallet_transactions')
@@ -80,10 +90,19 @@ export async function POST(req: NextRequest) {
         .eq('id', walletTxnId)
         .maybeSingle();
 
+      console.log('[Mock Callback V3] Step 7: Database query result:', {
+        found: !!walletTxn,
+        error: walletTxnError ? 'ERROR' : 'NO ERROR',
+        walletTxnId
+      });
+
       if (walletTxnError || !walletTxn) {
-        console.error('[Mock Callback] Error fetching wallet transaction:', walletTxnError);
+        console.error('[Mock Callback V3] ERROR: Wallet transaction not found or error occurred');
+        console.error('[Mock Callback V3] Error details:', walletTxnError);
         throw walletTxnError || new Error('Wallet transaction not found');
       }
+
+      console.log('[Mock Callback V3] Step 8: Transaction found, processing payment status:', status);
 
       const restaurantId = walletTxn.restaurant_id;
       const rechargeAmount = walletTxn.amount;
@@ -152,12 +171,31 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[Mock PhonePe Callback] CRITICAL ERROR:', error);
-    console.error('[Mock Callback] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error('[Mock Callback V3] ==================== CRITICAL ERROR ====================');
+    console.error('[Mock Callback V3] Error type:', typeof error);
+    console.error('[Mock Callback V3] Error:', error);
+
+    if (error instanceof Error) {
+      console.error('[Mock Callback V3] Error message:', error.message);
+      console.error('[Mock Callback V3] Error stack:', error.stack);
+    }
+
+    // Try to extract more details if it's a Supabase error
+    if (error && typeof error === 'object') {
+      console.error('[Mock Callback V3] Error object keys:', Object.keys(error));
+      console.error('[Mock Callback V3] Error details:', JSON.stringify(error, null, 2));
+    }
+
+    console.error('[Mock Callback V3] =========================================================');
+
     return NextResponse.json({
       success: false,
       message: error instanceof Error ? error.message : 'Unknown error',
-      error: error instanceof Error ? error.toString() : String(error)
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : String(error)
     }, { status: 500 });
   }
 }
