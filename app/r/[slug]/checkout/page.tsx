@@ -313,9 +313,24 @@ export default function CheckoutPage() {
           amountToPay,
           order.short_id
         );
-        setTimeout(() => {
-          window.location.href = upiLink;
-        }, 1000);
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+        if (isMobile) {
+          setTimeout(() => {
+            window.location.href = upiLink;
+          }, 1000);
+        } else {
+          localStorage.setItem('pending_payment', JSON.stringify({
+            orderId: order.id,
+            upiLink,
+            amount: amountToPay,
+            restaurantUPI: restaurant.upi_id,
+            restaurantName: restaurant.name,
+            orderShortId: order.short_id
+          }));
+          router.push(`/orders/${order.id}`);
+        }
       } else {
         router.push(`/orders/${order.id}`);
       }

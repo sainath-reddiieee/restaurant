@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, CheckCircle, Clock, ChefHat, Package, Home } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 import Link from 'next/link';
 
@@ -20,28 +21,38 @@ export default function OrderTrackingPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const orderId = params.id as string;
 
-  useEffect(() => {
-    if (!authLoading && (!profile || profile.role !== 'CUSTOMER')) {
-      router.push('/login');
-    }
-  }, [profile, authLoading, router]);
+  const [pendingPayment, setPendingPayment] = useState<any>(null);
 
   useEffect(() => {
-    if (profile?.role === 'CUSTOMER') {
-      fetchOrder();
+    const paymentData = localStorage.getItem('pending_payment');
+    if (paymentData) {
+      const payment = JSON.parse(paymentData);
+      if (payment.orderId === orderId) {
+        setPendingPayment(payment);
+        localStorage.removeItem('pending_payment');
+      }
     }
-  }, [profile, orderId]);
+  }, [orderId]);
+
+  useEffect(() => {
+    fetchOrder();
+  }, [orderId]);
 
   const fetchOrder = async () => {
-    const { data: orderData, error } = await supabase
+    const query = supabase
       .from('orders')
       .select('*')
-      .eq('id', orderId)
-      .eq('customer_id', profile!.id)
-      .maybeSingle();
+      .eq('id', orderId);
+
+    if (profile) {
+      query.eq('customer_id', profile.id);
+    }
+
+    const { data: orderData, error } = await query.maybeSingle();
 
     if (orderData) {
       setOrder(orderData);
@@ -163,6 +174,62 @@ export default function OrderTrackingPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-2xl">
+        {pendingPayment && (
+          <Card className="mb-6 border-2 border-orange-500 bg-orange-50">
+            <CardHeader>
+              <CardTitle className="text-xl text-orange-900">Complete Payment</CardTitle>
+              <CardDescription>Pay {formatPrice(pendingPayment.amount)} to confirm your order</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-white rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-2">UPI Payment Details</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">UPI ID:</span>
+                    <span className="font-mono font-semibold">{pendingPayment.restaurantUPI}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Amount:</span>
+                    <span className="font-semibold">{formatPrice(pendingPayment.amount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Note:</span>
+                    <span className="font-semibold">{pendingPayment.orderShortId}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-700">
+                  <strong>How to pay on Desktop:</strong>
+                </p>
+                <ol className="text-sm text-gray-600 space-y-1 ml-4 list-decimal">
+                  <li>Open any UPI app on your phone (Google Pay, PhonePe, Paytm, etc.)</li>
+                  <li>Select "Pay to UPI ID" or "Send Money"</li>
+                  <li>Enter UPI ID: <strong>{pendingPayment.restaurantUPI}</strong></li>
+                  <li>Enter amount: <strong>{formatPrice(pendingPayment.amount)}</strong></li>
+                  <li>Add note: <strong>{pendingPayment.orderShortId}</strong></li>
+                  <li>Complete the payment</li>
+                </ol>
+                <p className="text-xs text-gray-500 mt-3">
+                  Note: Adding the order ID in the payment note helps the restaurant verify your payment quickly.
+                </p>
+              </div>
+              <Button
+                className="w-full bg-orange-600 hover:bg-orange-700"
+                onClick={() => {
+                  navigator.clipboard.writeText(pendingPayment.restaurantUPI);
+                  toast({
+                    title: 'Copied!',
+                    description: 'UPI ID copied to clipboard',
+                  });
+                }}
+              >
+                Copy UPI ID
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
