@@ -21,27 +21,41 @@ export default function MockPaymentPage() {
   const mobileNumber = searchParams.get('mobileNumber') || '';
 
   const handlePaymentAction = async (status: 'success' | 'failed' | 'pending') => {
+    console.log('[Mock Payment V2] User clicked:', status);
+    console.log('[Mock Payment V2] Transaction ID:', merchantTransactionId);
+    console.log('[Mock Payment V2] Amount:', amount);
+
     setProcessing(true);
     setResult(status);
 
     try {
+      console.log('[Mock Payment V2] Calling callback endpoint...');
+      const callbackUrl = '/api/phonepe/mock/callback';
+      console.log('[Mock Payment V2] Callback URL:', callbackUrl);
+
+      const requestBody = {
+        merchantTransactionId,
+        status,
+        amount,
+        code: status === 'success' ? 'PAYMENT_SUCCESS' : 'PAYMENT_ERROR',
+        message: status === 'success' ? 'Payment successful' : 'Payment failed'
+      };
+      console.log('[Mock Payment V2] Request body:', requestBody);
+
       // Call the mock callback to update database
-      const callbackResponse = await fetch('/api/phonepe/mock/callback', {
+      const callbackResponse = await fetch(callbackUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          merchantTransactionId,
-          status,
-          amount,
-          code: status === 'success' ? 'PAYMENT_SUCCESS' : 'PAYMENT_ERROR',
-          message: status === 'success' ? 'Payment successful' : 'Payment failed'
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log('[Mock Payment V2] Callback response status:', callbackResponse.status);
+      console.log('[Mock Payment V2] Callback response ok:', callbackResponse.ok);
+
       const callbackData = await callbackResponse.json();
-      console.log('[Mock Payment] Callback response:', callbackData);
+      console.log('[Mock Payment V2] Callback response data:', callbackData);
 
       // Wait a bit to show the result
       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -63,9 +77,30 @@ export default function MockPaymentPage() {
         }
       }
     } catch (error) {
-      console.error('[Mock Payment] Error:', error);
-      alert('Error processing mock payment. Check console for details.');
+      console.error('[Mock Payment V2] ==================== ERROR ====================');
+      console.error('[Mock Payment V2] Error type:', typeof error);
+      console.error('[Mock Payment V2] Error:', error);
+
+      if (error instanceof Error) {
+        console.error('[Mock Payment V2] Error message:', error.message);
+        console.error('[Mock Payment V2] Error stack:', error.stack);
+        console.error('[Mock Payment V2] Error name:', error.name);
+      }
+
+      if (error && typeof error === 'object') {
+        console.error('[Mock Payment V2] Error keys:', Object.keys(error));
+        try {
+          console.error('[Mock Payment V2] Error JSON:', JSON.stringify(error, null, 2));
+        } catch (e) {
+          console.error('[Mock Payment V2] Could not stringify error');
+        }
+      }
+
+      console.error('[Mock Payment V2] =========================================================');
+
+      alert(`Error processing mock payment:\n${error instanceof Error ? error.message : String(error)}\n\nCheck browser console for details.`);
       setProcessing(false);
+      setResult(null);
     }
   };
 
