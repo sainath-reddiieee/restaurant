@@ -321,6 +321,15 @@ export default function CheckoutPage() {
           const phoneNumber = profile?.phone || guestPhone;
           const transactionId = `ORDER-${order.id}-${Date.now()}`;
 
+          // Update order with payment transaction ID
+          await supabase
+            .from('orders')
+            .update({
+              payment_transaction_id: transactionId,
+              payment_status: 'pending'
+            })
+            .eq('id', order.id);
+
           const response = await fetch('/api/phonepe/initiate', {
             method: 'POST',
             headers: {

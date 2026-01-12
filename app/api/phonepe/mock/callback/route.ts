@@ -29,11 +29,23 @@ export async function POST(req: NextRequest) {
     console.log('[Mock Callback V4] Step 3: Supabase client ready');
 
     // Update order status based on payment result
-    if (merchantTransactionId.startsWith('order_')) {
+    if (merchantTransactionId.startsWith('order_') || merchantTransactionId.startsWith('ORDER-')) {
+      console.log('[Mock Callback V4] Step 5: Processing order payment...');
+
+      // For ORDER- format, extract the order ID
+      // Format: ORDER-{uuid}-{timestamp}
+      let orderId = null;
+      if (merchantTransactionId.startsWith('ORDER-')) {
+        const parts = merchantTransactionId.split('-');
+        // Parts: ['ORDER', uuid part 1, uuid part 2, uuid part 3, uuid part 4, uuid part 5, timestamp]
+        orderId = parts.slice(1, 6).join('-'); // Reconstruct UUID
+        console.log('[Mock Callback V4] ORDER format - Extracted order ID:', orderId);
+      }
+
       const { data: order, error: fetchError } = await supabase
         .from('orders')
         .select('*')
-        .eq('payment_transaction_id', merchantTransactionId)
+        .or(orderId ? `payment_transaction_id.eq.${merchantTransactionId},id.eq.${orderId}` : `payment_transaction_id.eq.${merchantTransactionId}`)
         .maybeSingle();
 
       if (fetchError) {

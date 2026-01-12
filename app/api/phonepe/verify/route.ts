@@ -26,11 +26,21 @@ export async function GET(request: NextRequest) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      if (txnId.startsWith('order_')) {
+      if (txnId.startsWith('order_') || txnId.startsWith('ORDER-')) {
+        // For ORDER- format, extract the order ID
+        // Format: ORDER-{uuid}-{timestamp}
+        let orderId = null;
+        if (txnId.startsWith('ORDER-')) {
+          const parts = txnId.split('-');
+          // Parts: ['ORDER', uuid part 1, uuid part 2, uuid part 3, uuid part 4, uuid part 5, timestamp]
+          orderId = parts.slice(1, 6).join('-'); // Reconstruct UUID
+          console.log('[Mock Verify] ORDER format - Extracted order ID:', orderId);
+        }
+
         const { data: order, error } = await supabase
           .from('orders')
-          .select('status, payment_status, payment_transaction_id, total_amount')
-          .eq('payment_transaction_id', txnId)
+          .select('id, status, payment_status, payment_transaction_id, total_amount')
+          .or(orderId ? `payment_transaction_id.eq.${txnId},id.eq.${orderId}` : `payment_transaction_id.eq.${txnId}`)
           .maybeSingle();
 
         if (error) {
