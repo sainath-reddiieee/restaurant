@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
 import { 
   Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, 
-  User, Flame, Bike, Zap, Gift, Sparkles, Utensils, Pizza, Sandwich 
+  User, Flame, Bike, Zap, Gift, Sparkles, Utensils, Pizza, Sandwich,
+  Navigation, ChevronDown 
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
@@ -51,6 +52,10 @@ export default function Home() {
   const [lootItems, setLootItems] = useState<LootItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // --- NEW: Location State ---
+  const [locationName, setLocationName] = useState<string>('Select Location');
+  const [isLocating, setIsLocating] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user && profile) {
@@ -100,6 +105,9 @@ export default function Home() {
     };
 
     fetchData();
+    
+    // --- NEW: Auto-Detect Location on Load ---
+    detectLocation();
   }, []);
 
   useEffect(() => {
@@ -113,24 +121,63 @@ export default function Home() {
     }
   }, [searchQuery, restaurants]);
 
+  // --- NEW: Location Logic ---
+  const detectLocation = () => {
+    setIsLocating(true);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          // Simulator: In real app use Google Maps API to get address from Coords
+          setTimeout(() => {
+            setLocationName('Tadipatri, Andhra Pradesh');
+            setIsLocating(false);
+          }, 1500);
+        },
+        (error) => {
+          console.error('Location error:', error);
+          setLocationName('Tadipatri (Default)');
+          setIsLocating(false);
+        }
+      );
+    } else {
+      setLocationName('Location Unavailable');
+      setIsLocating(false);
+    }
+  };
+
   const mysteryItems = lootItems.filter(item => item.is_mystery);
   const liveLootItems = lootItems.filter(item => !item.is_mystery);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
+      {/* 1. HEADER WITH LOCATION DETECTOR */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm transition-all duration-300">
         <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg transform hover:rotate-12 transition-transform duration-300">
+          <div className="flex items-center justify-between gap-4">
+            
+            {/* Logo & Location Block */}
+            <div className="flex items-center gap-4 flex-1">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg transform hover:rotate-12 transition-transform duration-300 flex-shrink-0">
                 <ChefHat className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">GO515</h1>
-                <p className="text-[10px] font-medium text-orange-600 -mt-1 tracking-wide">LOCAL DELIVERY</p>
+              
+              {/* Location Selector */}
+              <div className="flex flex-col cursor-pointer group" onClick={detectLocation}>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-extrabold text-gray-900 tracking-tight hidden sm:block">GO515</h1>
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-wider">
+                    <Navigation className="w-3 h-3" />
+                    {isLocating ? 'Detecting...' : 'Delivering To'}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 text-gray-800 text-sm md:text-base font-bold group-hover:text-orange-600 transition-colors">
+                  <span className="truncate max-w-[150px] md:max-w-[300px]">{locationName}</span>
+                  <ChevronDown className={`w-4 h-4 text-orange-500 transition-transform ${isLocating ? 'animate-spin' : ''}`} />
+                </div>
               </div>
             </div>
             
+            {/* Buttons */}
             <div className="flex items-center gap-3">
               {!user && (
                 <>
@@ -162,7 +209,9 @@ export default function Home() {
                     const firstRestaurantInCart = JSON.parse(localStorage.getItem('cart') || '[]')[0]?.restaurant_id;
                     if (firstRestaurantInCart) {
                       const restaurant = restaurants.find(r => r.id === firstRestaurantInCart);
-                      if (restaurant) router.push(`/r/${restaurant.slug}/checkout`);
+                      if (restaurant) {
+                        router.push(`/r/${restaurant.slug}/checkout`);
+                      }
                     }
                   }}
                 >
@@ -175,7 +224,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* NEW MODERN HERO SECTION (Swiggy Style) */}
+      {/* 2. MODERN DARK HERO SECTION (Swiggy Style) */}
       <div className="relative bg-[#171a29] text-white pt-12 pb-20 px-4 rounded-b-[2.5rem] shadow-2xl overflow-hidden mb-8">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 opacity-10 pointer-events-none">
@@ -220,11 +269,11 @@ export default function Home() {
 
       <main className="container mx-auto px-4 max-w-7xl -mt-10 relative z-20">
         
-        {/* SIDE-BY-SIDE MAGIC BOX & LOOT LAYOUT */}
+        {/* 3. SIDE-BY-SIDE MAGIC BOX & LOOT LAYOUT */}
         {(mysteryItems.length > 0 || liveLootItems.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
             
-            {/* 1. Mystery Box Section */}
+            {/* Mystery Box Section */}
             {mysteryItems.length > 0 && (
               <div className="h-full transform hover:-translate-y-1 transition-transform duration-300">
                 <div className="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-3xl p-6 sm:p-8 shadow-2xl h-full border border-purple-500/30 relative overflow-hidden group">
@@ -288,7 +337,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* 2. Live Loot Mode Section */}
+            {/* Live Loot Mode Section */}
             {liveLootItems.length > 0 && (
               <div className="h-full transform hover:-translate-y-1 transition-transform duration-300">
                 <div className="bg-gradient-to-br from-orange-600 to-red-700 rounded-3xl p-6 sm:p-8 shadow-2xl h-full border border-orange-400/30 relative overflow-hidden group">
@@ -358,6 +407,7 @@ export default function Home() {
           </div>
         )}
 
+        {/* 4. POPULAR RESTAURANTS & LIST */}
         <div className="flex items-center justify-between mb-8 mt-12">
           <h2 className="text-2xl font-bold text-gray-900">Popular Restaurants</h2>
           <div className="hidden sm:flex gap-2">
@@ -402,15 +452,12 @@ export default function Home() {
                     </div>
                   )}
                   
-                  {/* Status Badge */}
                   <div className="absolute top-4 right-4">
                     <Badge className="bg-white/90 text-green-700 backdrop-blur-md shadow-sm border-0 px-3 font-bold hover:bg-white">
                       <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                       OPEN
                     </Badge>
                   </div>
-
-                  {/* Overlay Gradient */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 </div>
                 
