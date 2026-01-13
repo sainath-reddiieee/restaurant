@@ -14,9 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { VoiceRecorder } from '@/components/voice-recorder';
-import { Loader2, MapPin, Tag, CreditCard, Wallet, QrCode, ArrowLeft } from 'lucide-react';
+import { Loader2, MapPin, Tag, CreditCard, Wallet, QrCode, ArrowLeft, Trash2, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { formatPrice, generateUPIDeepLink } from '@/lib/format';
+import { formatPrice } from '@/lib/format';
 import { calculateGST, type GSTBreakdown } from '@/lib/gst-calculator';
 import Link from 'next/link';
 
@@ -24,7 +24,8 @@ export default function CheckoutPage() {
   const params = useParams();
   const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
-  const { items: cartItems, cartTotal, clearCart, isInitialized: cartInitialized } = useCart();
+  // Added removeItem and clearCart from hook
+  const { items: cartItems, cartTotal, clearCart, removeItem, isInitialized: cartInitialized } = useCart();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +64,7 @@ export default function CheckoutPage() {
         fetchWalletBalance();
       }
     }
-  }, [slug, cartItems.length, authLoading, profile, cartInitialized]);
+  }, [slug, cartItems.length, authLoading, profile, cartInitialized, router]); // Added router dependency
 
   const fetchWalletBalance = async () => {
     if (!profile) return;
@@ -316,12 +317,10 @@ export default function CheckoutPage() {
       });
 
       if (paymentMethod === 'PREPAID_UPI' && gstBreakdown.amountToPay > 0) {
-        // Initiate PhonePe payment
         try {
           const phoneNumber = profile?.phone || guestPhone;
           const transactionId = `ORDER-${order.id}-${Date.now()}`;
 
-          // Update order with payment transaction ID
           await supabase
             .from('orders')
             .update({
@@ -347,7 +346,6 @@ export default function CheckoutPage() {
           const data = await response.json();
 
           if (data.success && data.redirectUrl) {
-            // Redirect to PhonePe payment page
             window.location.href = data.redirectUrl;
           } else {
             throw new Error(data.error || 'Failed to initiate payment');
@@ -391,155 +389,157 @@ export default function CheckoutPage() {
   const totals = calculateTotal();
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b">
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="bg-white border-b sticky top-0 z-20">
         <div className="container mx-auto px-4 py-4">
-          <Link href={`/r/${slug}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+          <Link href={`/r/${slug}`} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm font-medium">
             <ArrowLeft className="h-4 w-4" />
             Back to Menu
           </Link>
-          <h1 className="text-2xl font-bold mt-2">Checkout</h1>
+          <h1 className="text-xl font-bold mt-2">Checkout</h1>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-2xl">
-          <Card className="mb-6">
-          <CardHeader>
+        <Card className="mb-6 shadow-sm border-gray-100">
+          <CardHeader className="pb-3 border-b border-gray-50 flex flex-row items-center justify-between">
             <CardTitle>Order Summary</CardTitle>
+            {cartItems.length > 0 && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearCart}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 text-xs h-8"
+              >
+                <XCircle className="h-4 w-4 mr-1.5" />
+                Clear Cart
+              </Button>
+            )}
           </CardHeader>
-          <CardContent className="space-y-2">
-            {cartItems.map(item => (
-              <div key={item.id} className="flex justify-between text-sm">
-                <span>
-                  {item.quantity}x {item.name}
-                </span>
-                <span>{formatPrice(item.selling_price * item.quantity)}</span>
+          <CardContent className="pt-4 space-y-4">
+            {cartItems.map(item => {
+              const isLoot = item.base_price > item.selling_price;
+              const savings = (item.base_price - item.selling_price) * item.quantity;
+              
+              return (
+                <div key={item.id} className="flex justify-between items-start group">
+                  <div className="flex gap-3">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-gray-800">{item.quantity}x</span>
+                        <span className="font-medium text-sm text-gray-700">{item.name}</span>
+                        {item.is_mystery && (
+                          <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 rounded font-bold">MYSTERY</span>
+                        )}
+                      </div>
+                      {isLoot && (
+                        <span className="text-[10px] text-green-600 font-medium mt-0.5">
+                          You saved {formatPrice(savings)}!
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="font-bold text-sm text-gray-900">{formatPrice(item.selling_price * item.quantity)}</div>
+                      {isLoot && (
+                        <div className="text-[10px] text-gray-400 line-through decoration-gray-400">
+                          {formatPrice(item.base_price * item.quantity)}
+                        </div>
+                      )}
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-gray-300 hover:text-red-500 hover:bg-red-50 -mr-2 transition-colors"
+                      onClick={() => removeItem(item.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <Separator className="my-2" />
+
+            <div className="space-y-2 pt-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span>{formatPrice(totals.subtotalBeforeGST)}</span>
               </div>
-            ))}
 
-            <Separator className="my-3" />
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>GST (5% Food)</span>
+                <span>{formatPrice(totals.foodGSTAmount)}</span>
+              </div>
 
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>Subtotal (before GST)</span>
-              <span>{formatPrice(totals.subtotalBeforeGST)}</span>
-            </div>
-
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>GST on Food (5%)</span>
-              <span>{formatPrice(totals.foodGSTAmount)}</span>
-            </div>
-
-            <div className="flex justify-between">
-              <span>Food Total</span>
-              <span>{formatPrice(totals.subtotalAfterGST)}</span>
-            </div>
-
-            {totals.deliveryFeeAfterGST > 0 && (
-              <>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>Delivery Fee (before GST)</span>
-                  <span>{formatPrice(totals.deliveryFeeBeforeGST)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-600">
-                  <span>GST on Delivery (18%)</span>
-                  <span>{formatPrice(totals.deliveryGSTAmount)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Delivery Fee</span>
-                  <span>{formatPrice(totals.deliveryFeeAfterGST)}</span>
-                </div>
-              </>
-            )}
-
-            {totals.deliveryFeeAfterGST === 0 && (
-              <div className="flex justify-between text-green-600">
+              <div className="flex justify-between text-sm text-gray-600">
                 <span>Delivery Fee</span>
-                <span>FREE</span>
+                {totals.deliveryFeeAfterGST === 0 ? (
+                  <span className="text-green-600 font-medium">FREE</span>
+                ) : (
+                  <span>{formatPrice(totals.deliveryFeeAfterGST)}</span>
+                )}
               </div>
-            )}
 
-            {appliedCoupon && (
-              <div className="flex justify-between text-green-600">
-                <span>Discount ({appliedCoupon.code})</span>
-                <span>-{formatPrice(totals.discountAmount)}</span>
-              </div>
-            )}
-
-            <Separator className="my-3" />
-
-            <div className="flex justify-between text-sm font-medium text-gray-700 bg-gray-50 -mx-6 px-6 py-2">
-              <span>Total GST</span>
-              <span>{formatPrice(totals.totalGSTAmount)}</span>
+              {appliedCoupon && (
+                <div className="flex justify-between text-sm text-green-600 font-medium">
+                  <span>Coupon ({appliedCoupon.code})</span>
+                  <span>-{formatPrice(totals.discountAmount)}</span>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-between text-xs text-gray-500 -mx-6 px-6">
-              <span>CGST: {formatPrice(totals.cgstAmount)}</span>
-              <span>SGST: {formatPrice(totals.sgstAmount)}</span>
-            </div>
+            <Separator className="my-2" />
 
-            <Separator className="my-3" />
-
-            <div className="flex justify-between font-bold text-lg">
-              <span>Grand Total</span>
+            <div className="flex justify-between font-bold text-lg pt-1">
+              <span>Total</span>
               <span>{formatPrice(totals.grandTotal)}</span>
             </div>
 
             {useWallet && totals.walletDeduction > 0 && (
-              <>
-                <div className="flex justify-between text-green-600">
-                  <span>Wallet Used</span>
+              <div className="bg-green-50 p-3 rounded-lg border border-green-100 mt-2">
+                <div className="flex justify-between text-green-700 text-sm font-medium mb-1">
+                  <span>Wallet Balance Used</span>
                   <span>-{formatPrice(totals.walletDeduction)}</span>
                 </div>
-                <Separator />
-                <div className="flex justify-between font-bold text-lg text-orange-600">
-                  <span>Amount to Pay</span>
+                <Separator className="bg-green-200 my-2" />
+                <div className="flex justify-between font-bold text-base text-green-800">
+                  <span>To Pay</span>
                   <span>{formatPrice(totals.amountToPay)}</span>
                 </div>
-              </>
-            )}
-
-            {restaurant?.gst_enabled !== false && (
-              <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg mt-3">
-                <p className="font-medium text-blue-900 mb-1">GST Breakdown:</p>
-                <p>GST is added as per Indian government regulations.</p>
-                <p>Food: 5% (CGST 2.5% + SGST 2.5%)</p>
-                <p>Delivery: 18% (CGST 9% + SGST 9%)</p>
-                {restaurant?.gst_number && (
-                  <p className="mt-1">Restaurant GSTIN: {restaurant.gst_number}</p>
-                )}
               </div>
             )}
           </CardContent>
         </Card>
 
-{walletBalance > 0 && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+        {walletBalance > 0 && (
+          <Card className="mb-6 shadow-sm border-gray-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Wallet className="h-5 w-5 text-green-600" />
-                Use Wallet Balance
+                Use Wallet
               </CardTitle>
-              <CardDescription>
-                Available balance: {formatPrice(walletBalance)}
-              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center space-x-2 p-4 border rounded-lg bg-green-50 border-green-200">
+              <div className="flex items-center space-x-3 p-3 border rounded-xl bg-gray-50 border-gray-200 hover:border-green-300 transition-colors">
                 <input
                   type="checkbox"
                   id="use-wallet"
                   checked={useWallet}
                   onChange={(e) => setUseWallet(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                  className="h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
                 />
                 <Label htmlFor="use-wallet" className="cursor-pointer flex-1">
-                  <div className="font-semibold">
-                    Use Wallet Balance ({formatPrice(Math.min(walletBalance, totals.grandTotal))})
+                  <div className="font-semibold text-sm">
+                    Available Balance: {formatPrice(walletBalance)}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-gray-500">
                     {walletBalance >= totals.grandTotal
-                      ? 'Your wallet will cover the full amount!'
-                      : `Reduce your payment by ${formatPrice(walletBalance)}`}
+                      ? 'Fully covers this order'
+                      : `Save ${formatPrice(walletBalance)} instantly`}
                   </div>
                 </Label>
               </div>
@@ -548,130 +548,139 @@ export default function CheckoutPage() {
         )}
 
         {!appliedCoupon ? (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Tag className="h-5 w-5" />
-                Apply Coupon
+          <Card className="mb-6 shadow-sm border-gray-100">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Tag className="h-5 w-5 text-orange-500" />
+                Have a Coupon?
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent>
               <div className="flex gap-2">
                 <Input
-                  placeholder="Enter coupon code"
+                  placeholder="Enter code (e.g. WELCOME50)"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  className="uppercase"
                 />
-                <Button onClick={applyCoupon} variant="outline">
+                <Button onClick={applyCoupon} variant="outline" className="text-orange-600 border-orange-200 hover:bg-orange-50">
                   Apply
                 </Button>
               </div>
             </CardContent>
           </Card>
         ) : (
-          <Card className="mb-6 border-green-500">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Tag className="h-5 w-5 text-green-600" />
-                  <span className="font-semibold">{appliedCoupon.code} applied!</span>
-                  <span className="text-green-600">Saved {formatPrice(totals.discountAmount)}</span>
-                </div>
-                <Button variant="ghost" size="sm" onClick={removeCoupon}>
-                  Remove
-                </Button>
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="bg-green-100 p-2 rounded-full">
+                <Tag className="h-4 w-4 text-green-700" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <div className="font-bold text-sm text-green-800">'{appliedCoupon.code}' Applied</div>
+                <div className="text-xs text-green-600">You saved {formatPrice(totals.discountAmount)}</div>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={removeCoupon} className="text-green-700 hover:text-green-900 hover:bg-green-100">
+              Remove
+            </Button>
+          </div>
         )}
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
+        <Card className="mb-6 shadow-sm border-gray-100">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MapPin className="h-5 w-5 text-blue-500" />
               Delivery Details
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {!profile && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="guest-phone">Phone Number *</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="guest-phone" className="text-xs">Phone *</Label>
                   <Input
                     id="guest-phone"
                     type="tel"
-                    placeholder="Enter your phone number"
+                    placeholder="9876543210"
                     value={guestPhone}
                     onChange={(e) => setGuestPhone(e.target.value)}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">Required for delivery updates</p>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="guest-name">Name (Optional)</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="guest-name" className="text-xs">Name</Label>
                   <Input
                     id="guest-name"
-                    placeholder="Enter your name"
+                    placeholder="John Doe"
                     value={guestName}
                     onChange={(e) => setGuestName(e.target.value)}
                   />
                 </div>
-              </>
+              </div>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="address">Delivery Address *</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="address" className="text-xs">Address *</Label>
               <Textarea
                 id="address"
-                placeholder="Enter your full address"
+                placeholder="House No, Street, Landmark..."
                 value={deliveryAddress}
                 onChange={(e) => setDeliveryAddress(e.target.value)}
                 required
-                rows={3}
+                rows={2}
+                className="resize-none"
               />
             </div>
             {gpsCoordinates && (
-              <p className="text-xs text-muted-foreground">
-                Location captured: {gpsCoordinates}
-              </p>
+              <div className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-3 py-2 rounded-lg">
+                <MapPin className="h-3 w-3" />
+                GPS Location Captured
+              </div>
             )}
             <VoiceRecorder onRecordingComplete={setVoiceNoteUrl} />
           </CardContent>
         </Card>
 
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Payment Method</CardTitle>
-            <CardDescription>Choose how you want to pay</CardDescription>
+        <Card className="mb-8 shadow-sm border-gray-100">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Payment Method</CardTitle>
           </CardHeader>
           <CardContent>
-            <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)}>
-              <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-gray-50">
+            <RadioGroup value={paymentMethod} onValueChange={(value: any) => setPaymentMethod(value)} className="space-y-3">
+              <div className={`flex items-center space-x-3 p-3 border rounded-xl cursor-pointer transition-all ${paymentMethod === 'PREPAID_UPI' ? 'border-green-500 bg-green-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                 <RadioGroupItem value="PREPAID_UPI" id="prepaid" />
-                <Label htmlFor="prepaid" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <CreditCard className="h-5 w-5 text-green-600" />
+                <Label htmlFor="prepaid" className="flex items-center gap-3 cursor-pointer flex-1">
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm">
+                    <CreditCard className="h-5 w-5 text-green-600" />
+                  </div>
                   <div>
-                    <div className="font-semibold">Pay Now (UPI)</div>
-                    <div className="text-xs text-muted-foreground">Instant payment via UPI</div>
+                    <div className="font-semibold text-sm">Pay Now (UPI)</div>
+                    <div className="text-xs text-gray-500">Fastest checkout</div>
                   </div>
                 </Label>
               </div>
-              <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-gray-50">
+              
+              <div className={`flex items-center space-x-3 p-3 border rounded-xl cursor-pointer transition-all ${paymentMethod === 'COD_CASH' ? 'border-orange-500 bg-orange-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                 <RadioGroupItem value="COD_CASH" id="cod-cash" />
-                <Label htmlFor="cod-cash" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <Wallet className="h-5 w-5 text-orange-600" />
+                <Label htmlFor="cod-cash" className="flex items-center gap-3 cursor-pointer flex-1">
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm">
+                    <Wallet className="h-5 w-5 text-orange-600" />
+                  </div>
                   <div>
-                    <div className="font-semibold">Cash on Delivery</div>
-                    <div className="text-xs text-muted-foreground">Keep exact change ready</div>
+                    <div className="font-semibold text-sm">Cash on Delivery</div>
+                    <div className="text-xs text-gray-500">Pay cash to rider</div>
                   </div>
                 </Label>
               </div>
-              <div className="flex items-center space-x-2 p-4 border rounded-lg hover:bg-gray-50">
+
+              <div className={`flex items-center space-x-3 p-3 border rounded-xl cursor-pointer transition-all ${paymentMethod === 'COD_UPI_SCAN' ? 'border-blue-500 bg-blue-50/50' : 'border-gray-200 hover:bg-gray-50'}`}>
                 <RadioGroupItem value="COD_UPI_SCAN" id="cod-upi" />
-                <Label htmlFor="cod-upi" className="flex items-center gap-2 cursor-pointer flex-1">
-                  <QrCode className="h-5 w-5 text-blue-600" />
+                <Label htmlFor="cod-upi" className="flex items-center gap-3 cursor-pointer flex-1">
+                  <div className="p-2 bg-white rounded-lg border border-gray-100 shadow-sm">
+                    <QrCode className="h-5 w-5 text-blue-600" />
+                  </div>
                   <div>
-                    <div className="font-semibold">UPI on Delivery</div>
-                    <div className="text-xs text-muted-foreground">Scan rider's QR at door</div>
+                    <div className="font-semibold text-sm">Scan & Pay on Delivery</div>
+                    <div className="text-xs text-gray-500">Pay via QR at door</div>
                   </div>
                 </Label>
               </div>
@@ -679,22 +688,30 @@ export default function CheckoutPage() {
           </CardContent>
         </Card>
 
-        <Button
-          onClick={placeOrder}
-          disabled={submitting || !deliveryAddress.trim()}
-          className="w-full h-12 text-lg bg-orange-600 hover:bg-orange-700"
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Placing Order...
-            </>
-          ) : (
-            <>
-              Place Order • {totals.amountToPay === 0 ? 'FREE (Wallet)' : formatPrice(totals.amountToPay)}
-            </>
-          )}
-        </Button>
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t shadow-lg z-50">
+          <div className="container mx-auto max-w-2xl">
+            <Button
+              onClick={placeOrder}
+              disabled={submitting || !deliveryAddress.trim()}
+              className="w-full h-12 text-base font-bold bg-orange-600 hover:bg-orange-700 shadow-orange-200 shadow-lg"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <div className="flex items-center justify-between w-full px-2">
+                  <span className="text-orange-100 font-medium">
+                    {totals.amountToPay === 0 ? 'FREE' : formatPrice(totals.amountToPay)}
+                  </span>
+                  <span>Place Order</span>
+                </div>
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="h-16"></div> {/* Spacer for fixed bottom button */}
       </div>
     </div>
   );
