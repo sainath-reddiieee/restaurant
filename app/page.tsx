@@ -193,7 +193,7 @@ export default function Home() {
             Hungry? <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">We got you.</span>
           </h1>
           <p className="text-gray-400 text-lg md:text-xl mb-10 max-w-2xl mx-auto leading-relaxed">
-            Order from top local restaurants in Anantapur & Tadipatri. Fast delivery, better prices.
+            Order from top local restaurants. Fast delivery, better prices.
           </p>
 
           {/* Floating Search Bar */}
