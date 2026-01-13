@@ -482,7 +482,7 @@ export default function Home() {
           {!user && (
             <p className="mb-2">Restaurant Partner? <button onClick={() => router.push('/partner')} className="text-orange-600 hover:underline font-medium hover:text-orange-700 transition-colors duration-300">Login here</button></p>
           )}
-          <p className="text-[10px] sm:text-xs text-gray-500">© 2026 GO515. Digital Storefront & Logistics OS for Tier-2 Cities.</p>
+          <p className="text-[10px] sm:text-xs text-gray-500">© 2026 GO515 for Tier-2 Cities.</p>
         </div>
       </footer>
     </div>
