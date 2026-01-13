@@ -29,7 +29,7 @@ export default function TermsPage() {
         
         <section>
           <h2 className="text-xl font-semibold mb-2">5. Contact Us</h2>
-          <p>If you have any questions, please contact us at support@go515.in</p>
+          <p>If you have any questions, please contact us at psainath123@gmail.com</p>
         </section>
       </div>
     </div>
