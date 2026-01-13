@@ -13,25 +13,13 @@ import { supabase } from '@/lib/supabase/client';
 import { 
   Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, 
   User, Flame, Bike, Zap, Gift, Sparkles, Utensils, Pizza, Sandwich,
-  Navigation, ChevronDown, Bell, CheckCircle2
+  Navigation, ChevronDown, Bell, CheckCircle2, ArrowRight
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
-// --- EXPANSION-READY LOCATIONS (Anantapur District) ---
-const POPULAR_LOCATIONS = [
-  "Clock Tower, Anantapur",
-  "Sapthagiri Circle, Anantapur",
-  "JNTU College, Anantapur",
-  "Jesus Nagar, Anantapur",
-  "Tadipatri Bus Stand",
-  "Gandhi Nagar, Tadipatri",
-  "Sanjivini Hospital, Tadipatri",
-  "Yellanur Road, Tadipatri"
-];
-
-// --- LIVE TICKER UPDATES (Simulated Network Activity) ---
+// --- LIVE UPDATES (Generic) ---
 const LIVE_UPDATES = [
-  "Someone in Clock Tower just ordered Chicken Biryani 🍗",
+  "Someone nearby just ordered Chicken Biryani 🍗",
   "New order placed for 2x Large Pizzas 🍕",
   "Raju's Kitchen is trending right now! 🔥",
   "A customer just saved ₹150 on a Mystery Box 🎁",
@@ -79,6 +67,7 @@ export default function Home() {
 
   // Location & UI State
   const [locationName, setLocationName] = useState<string>('Select Location');
+  const [manualLocation, setManualLocation] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
@@ -113,9 +102,8 @@ export default function Home() {
     };
 
     fetchData();
-    detectLocation(); // Auto-trigger real GPS on load
+    detectLocation(); // Try Auto-detect on load
 
-    // Ticker Animation Interval
     const interval = setInterval(() => {
       setCurrentUpdateIndex((prev) => (prev + 1) % LIVE_UPDATES.length);
     }, 4000);
@@ -131,12 +119,12 @@ export default function Home() {
     }
   }, [searchQuery, restaurants]);
 
-  // --- 🌍 REAL GPS REVERSE GEOCODING LOGIC ---
+  // --- 🌍 REAL GPS LOGIC ---
   const detectLocation = () => {
     setIsLocating(true);
     
     if (!('geolocation' in navigator)) {
-      setLocationName('GPS Unavailable');
+      setLocationName('Location Unavailable');
       setIsLocating(false);
       return;
     }
@@ -146,7 +134,7 @@ export default function Home() {
         try {
           const { latitude, longitude } = position.coords;
           
-          // Using OpenStreetMap Nominatim (Free, No Key Required)
+          // Reverse Geocoding
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
@@ -156,8 +144,8 @@ export default function Home() {
           const data = await response.json();
           const address = data.address;
           
-          // Construct a smart location string
-          const area = address.suburb || address.neighbourhood || address.road || '';
+          // Construct Address: Prioritize Neighborhood/Suburb
+          const area = address.suburb || address.neighbourhood || address.residential || address.road || '';
           const city = address.city || address.town || address.village || address.county || '';
           
           const finalLocation = area ? `${area}, ${city}` : city;
@@ -165,23 +153,29 @@ export default function Home() {
           
         } catch (error) {
           console.error('Error fetching address:', error);
-          setLocationName('GPS Active (Address not found)');
+          setLocationName('GPS Active');
         } finally {
           setIsLocating(false);
         }
       },
       (error) => {
-        console.error('Location permission denied:', error);
-        // Don't change locationName if denied, keep "Select Location"
+        console.error('Location error:', error);
+        // Do not force any default. Let user see "Select Location"
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 10000, 
+        maximumAge: 0 
+      }
     );
   };
 
-  const handleManualLocation = (loc: string) => {
-    setLocationName(loc);
-    setIsLocationOpen(false);
+  const saveManualLocation = () => {
+    if (manualLocation.trim()) {
+      setLocationName(manualLocation);
+      setIsLocationOpen(false);
+    }
   };
 
   const mysteryItems = lootItems.filter(item => item.is_mystery);
@@ -190,7 +184,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-20 font-sans">
       
-      {/* 1. LIVE CRAVINGS TICKER (Expansion Ready) */}
+      {/* 1. TICKER */}
       <div className="bg-black text-white text-[10px] sm:text-xs py-1.5 overflow-hidden relative z-50">
         <div className="container mx-auto px-4 flex items-center justify-center gap-2 animate-in fade-in duration-1000 key={currentUpdateIndex}">
           <Bell className="w-3 h-3 text-orange-500 animate-bounce" />
@@ -200,12 +194,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2. GLASS HEADER (Sticky & Blurred) */}
+      {/* 2. HEADER */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm transition-all duration-300">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             
-            {/* Brand & Location Selector */}
+            {/* Logo & Location */}
             <div className="flex items-center gap-3 flex-1 overflow-hidden">
               <div className="w-10 h-10 bg-gradient-to-tr from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 transform hover:scale-105 transition-transform flex-shrink-0">
                 <ChefHat className="w-6 h-6 text-white" />
@@ -217,7 +211,7 @@ export default function Home() {
               >
                 <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-widest">
                   <Navigation className="w-3 h-3" />
-                  {isLocating ? 'Locating...' : 'Delivering To'}
+                  {isLocating ? 'Detecting...' : 'Delivering To'}
                 </div>
                 <div className="flex items-center gap-1 text-gray-900 text-sm font-bold group-hover:text-orange-600 transition-colors">
                   <span className="truncate max-w-[150px] sm:max-w-[300px] block">
@@ -228,7 +222,7 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Right Actions */}
+            {/* Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
               {!user ? (
                 <>
@@ -273,27 +267,24 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 3. PREMIUM HERO SECTION (Aurora Effect) */}
+      {/* 3. HERO SECTION */}
       <div className="relative bg-[#121212] text-white pt-16 pb-24 px-4 rounded-b-[3rem] shadow-2xl overflow-hidden mb-10">
-        {/* Animated "Aurora" Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-[-50px] right-[-50px] w-96 h-96 bg-purple-600/30 rounded-full blur-[100px] animate-pulse"></div>
           <div className="absolute bottom-[-50px] left-[-50px] w-96 h-96 bg-orange-600/20 rounded-full blur-[100px] animate-pulse delay-1000"></div>
-          {/* Floating Icons */}
           <Pizza className="absolute top-12 right-[10%] w-16 h-16 text-white/5 rotate-12" />
           <Utensils className="absolute bottom-20 left-[5%] w-20 h-20 text-white/5 -rotate-12" />
         </div>
 
         <div className="relative z-10 container mx-auto text-center max-w-2xl">
           <Badge className="bg-white/10 text-white border-white/10 backdrop-blur-md mb-6 px-4 py-1.5 text-xs font-medium rounded-full hover:bg-white/20 transition-colors cursor-default">
-            🚀 Superfast Delivery in Anantapur District
+            🚀 Superfast Delivery in Your City
           </Badge>
           <h1 className="text-4xl sm:text-6xl font-black mb-6 tracking-tight leading-tight drop-shadow-2xl">
             Craving something <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">Delicious?</span>
           </h1>
           
-          {/* Enhanced Search Bar */}
           <div className="relative max-w-lg mx-auto group">
             <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
             <div className="relative flex items-center bg-white rounded-full p-1.5 shadow-2xl">
@@ -317,7 +308,7 @@ export default function Home() {
 
       <main className="container mx-auto px-4 max-w-7xl -mt-16 relative z-20 space-y-12">
         
-        {/* 4. CATEGORY SLIDER (Bento Style) */}
+        {/* 4. CATEGORIES */}
         <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Eat what makes you happy</h3>
           <div className="flex gap-4 sm:gap-8 overflow-x-auto no-scrollbar pb-2">
@@ -339,11 +330,11 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 5. LOOT & MYSTERY SECTIONS (Side-by-Side Visuals) */}
+        {/* 5. LOOT & MYSTERY */}
         {(mysteryItems.length > 0 || liveLootItems.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Mystery Box Card */}
+            {/* Mystery Box */}
             {mysteryItems.length > 0 && (
               <div className="bg-gradient-to-br from-purple-900 to-indigo-900 rounded-3xl p-6 relative overflow-hidden shadow-2xl shadow-purple-900/20 group cursor-pointer border border-purple-500/20">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/30 rounded-full blur-3xl -mr-10 -mt-10"></div>
@@ -375,7 +366,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Live Loot Card */}
+            {/* Live Loot */}
             {liveLootItems.length > 0 && (
               <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl p-6 relative overflow-hidden shadow-2xl shadow-orange-500/20 group cursor-pointer border border-orange-400/20">
                 <div className="absolute bottom-0 left-0 w-40 h-40 bg-yellow-400/30 rounded-full blur-3xl -ml-10 -mb-10"></div>
@@ -412,7 +403,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. POPULAR RESTAURANTS LIST (Dynamic Header) */}
+        {/* 6. RESTAURANTS LIST */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -479,7 +470,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* 7. ABOUT SECTION (Scalable Branding) */}
+      {/* 7. ABOUT SECTION (Generic) */}
       <section className="container mx-auto px-4 mt-24 mb-10">
         <div className="bg-[#1a1c20] rounded-[2.5rem] p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl">
           <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
@@ -491,7 +482,7 @@ export default function Home() {
                 Built for <span className="text-orange-500">Tier-2 Cities</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                GO515 connects local restaurants in Anantapur District with food lovers like you. We believe great food delivery shouldn't be limited to metros.
+                GO515 connects local restaurants with food lovers like you. We believe great food delivery shouldn't be limited to metros.
               </p>
               
               <div className="grid grid-cols-2 gap-6">
@@ -530,7 +521,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 8. MANUAL LOCATION MODAL (Includes Anantapur) */}
+      {/* 8. MANUAL LOCATION MODAL (With Typing Support) */}
       <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -549,27 +540,24 @@ export default function Home() {
               Use Current Location (GPS)
             </Button>
             
-            <div className="relative">
+            <div className="relative py-2">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or choose popular area</span>
+                <span className="bg-background px-2 text-muted-foreground">Or type manually</span>
               </div>
             </div>
 
-            <div className="grid gap-2 max-h-[200px] overflow-y-auto pr-2">
-              {POPULAR_LOCATIONS.map((loc) => (
-                <Button
-                  key={loc}
-                  variant="ghost"
-                  className="w-full justify-start font-normal"
-                  onClick={() => handleManualLocation(loc)}
-                >
-                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-                  {loc}
-                </Button>
-              ))}
+            <div className="flex gap-2">
+              <Input 
+                placeholder="Enter city or area (e.g. Tadipatri)" 
+                value={manualLocation}
+                onChange={(e) => setManualLocation(e.target.value)}
+              />
+              <Button size="icon" onClick={saveManualLocation}>
+                <ArrowRight className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </DialogContent>
