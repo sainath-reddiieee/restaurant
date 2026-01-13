@@ -48,8 +48,8 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-gray-900 mb-4">Contact Us</h3>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li>Anantapur, Andhra Pradesh</li>
-              <li>Email: support@go515.in</li>
+              <li>PNR Kitchens Tadipatri, Andhra Pradesh</li>
+              <li>Email: psainath123@gmail.com</li>
               <li>Phone: +91 9441414140</li>
             </ul>
           </div>
