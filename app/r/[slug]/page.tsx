@@ -6,19 +6,33 @@ import { useAuth } from '@/components/providers/auth-provider';
 import { useCart } from '@/components/providers/cart-provider';
 import { supabase } from '@/lib/supabase/client';
 import type { Restaurant, MenuItem } from '@/lib/supabase/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Loader2, ShoppingCart, Plus, Minus, Zap, Gift, ArrowLeft, Star, Leaf } from 'lucide-react';
+import { 
+  Loader2, ShoppingCart, Plus, Minus, Zap, Gift, ArrowLeft, 
+  Star, MapPin, Search, ChevronRight, Share2, Info, Clock 
+} from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 import Link from 'next/link';
 
+// Standard Indian Food Industry Icons
+const VegIcon = () => (
+  <div className="w-4 h-4 border border-green-600 flex items-center justify-center p-[2px] bg-white rounded-[2px] flex-shrink-0">
+    <div className="w-full h-full bg-green-600 rounded-full"></div>
+  </div>
+);
+
+const NonVegIcon = () => (
+  <div className="w-4 h-4 border border-red-600 flex items-center justify-center p-[2px] bg-white rounded-[2px] flex-shrink-0">
+    <div className="w-full h-full bg-red-600 rounded-full"></div>
+  </div>
+);
+
 export default function RestaurantMenuPage() {
   const params = useParams();
   const router = useRouter();
-  const { profile, loading: authLoading } = useAuth();
   const { items: cartItems, addItem, updateQuantity, cartTotal, itemCount } = useCart();
   const { toast } = useToast();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
@@ -34,7 +48,7 @@ export default function RestaurantMenuPage() {
   }, [slug]);
 
   const fetchRestaurant = async () => {
-    const { data: restaurantData, error: restaurantError } = await supabase
+    const { data: restaurantData } = await supabase
       .from('restaurants')
       .select('*')
       .eq('slug', slug)
@@ -50,7 +64,7 @@ export default function RestaurantMenuPage() {
         description: 'This restaurant is not available',
         variant: 'destructive',
       });
-      router.push('/menu');
+      router.push('/');
     }
     setLoading(false);
   };
@@ -66,26 +80,6 @@ export default function RestaurantMenuPage() {
     if (data) {
       setMenuItems(data);
     }
-
-    const channel = supabase
-      .channel('menu-items')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'menu_items',
-          filter: `restaurant_id=eq.${restaurantId}`,
-        },
-        () => {
-          fetchMenuItems(restaurantId);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const handleAddToCart = async (item: MenuItem) => {
@@ -98,8 +92,9 @@ export default function RestaurantMenuPage() {
       return;
     }
 
+    // Optimistic UI update handled by cart provider, but we need to check stock for clearance
     if (item.is_clearance) {
-      const { data, error } = await supabase.rpc('decrement_stock', {
+      const { data } = await supabase.rpc('decrement_stock', {
         item_id: item.id,
         quantity: 1,
       });
@@ -118,6 +113,7 @@ export default function RestaurantMenuPage() {
     toast({
       title: 'Added to cart',
       description: `${item.name} added to your cart`,
+      duration: 1000,
     });
   };
 
@@ -128,363 +124,365 @@ export default function RestaurantMenuPage() {
 
   const getDeliveryInfo = () => {
     if (!restaurant) return null;
-
     if (restaurant.free_delivery_threshold) {
       const remaining = restaurant.free_delivery_threshold - cartTotal;
-      if (remaining > 0) {
-        return {
-          message: `Add ${formatPrice(remaining)} more for FREE DELIVERY!`,
-          isFree: false,
-        };
-      }
-      return {
-        message: 'You qualify for FREE DELIVERY!',
-        isFree: true,
-      };
+      if (remaining > 0) return { message: `Add ${formatPrice(remaining)} for FREE DELIVERY`, isFree: false };
+      return { message: 'Free Delivery Unlocked!', isFree: true };
     }
-
-    return {
-      message: `Delivery fee: ${formatPrice(restaurant.delivery_fee)}`,
-      isFree: false,
-    };
+    return { message: `Delivery: ${formatPrice(restaurant.delivery_fee)}`, isFree: false };
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
       </div>
     );
   }
 
-  if (!restaurant) {
-    return null;
-  }
+  if (!restaurant) return null;
 
-  const filterByVeg = (items: MenuItem[]) => {
-    if (vegFilter === 'veg') return items.filter(item => item.is_veg);
-    if (vegFilter === 'non-veg') return items.filter(item => !item.is_veg);
-    return items;
-  };
+  const filteredMenuItems = menuItems.filter(item => {
+    if (vegFilter === 'veg') return item.is_veg;
+    if (vegFilter === 'non-veg') return !item.is_veg;
+    return true;
+  });
 
-  const filteredMenuItems = filterByVeg(menuItems);
   const lootItems = filteredMenuItems.filter(item => item.is_clearance);
   const regularItems = filteredMenuItems.filter(item => !item.is_clearance);
   const categories = Array.from(new Set(regularItems.map(item => item.category)));
   const deliveryInfo = getDeliveryInfo();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white">
-        <div className="container mx-auto px-4 py-6">
-          <Link href="/" className="flex items-center gap-2 text-white/90 hover:text-white mb-4">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Restaurants
-          </Link>
-          <h1 className="text-3xl font-bold">{restaurant.name}</h1>
-          {restaurant.rating_count > 0 && (
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded">
-                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                <span className="font-semibold">{restaurant.rating_avg}</span>
-              </div>
-              <span className="text-white/80 text-sm">({restaurant.rating_count} reviews)</span>
+    <div className="min-h-screen bg-[#f4f5f7] pb-32">
+      
+      {/* 1. RESTAURANT HEADER */}
+      <div className="relative bg-[#171a29] text-white overflow-hidden rounded-b-[2rem] shadow-xl">
+        
+        {/* Background Image (Blurred) */}
+        {restaurant.image_url ? (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={restaurant.image_url} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-40 blur-md scale-110"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#171a29] via-[#171a29]/80 to-transparent"></div>
+          </div>
+        ) : (
+          <div className="absolute inset-0 z-0 bg-gradient-to-br from-gray-900 to-black opacity-90"></div>
+        )}
+
+        <div className="relative z-10 container mx-auto px-4 pt-6 pb-8">
+          {/* Nav Bar */}
+          <div className="flex items-center justify-between mb-6">
+            <Link href="/" className="p-2 bg-black/30 hover:bg-black/50 rounded-full backdrop-blur-md transition-all border border-white/10">
+              <ArrowLeft className="h-5 w-5 text-white" />
+            </Link>
+            <div className="flex gap-3">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-full">
+                <Search className="h-5 w-5" />
+              </Button>
             </div>
-          )}
-          {deliveryInfo && (
-            <p className="mt-2 text-white/90">{deliveryInfo.message}</p>
-          )}
+          </div>
+
+          {/* Restaurant Details */}
+          <div className="max-w-4xl mx-auto">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="flex-1">
+                <h1 className="text-3xl md:text-5xl font-extrabold mb-2 tracking-tight leading-tight text-white drop-shadow-lg">
+                  {restaurant.name}
+                </h1>
+                
+                <div className="flex flex-wrap items-center gap-3 text-gray-300 text-sm mb-4">
+                  {restaurant.location_address && (
+                    <span className="flex items-center gap-1 bg-white/10 px-2 py-1 rounded backdrop-blur-sm">
+                      <MapPin className="h-3 w-3" /> {restaurant.location_address}
+                    </span>
+                  )}
+                  <span className="px-2 py-1 rounded bg-green-500/20 text-green-300 border border-green-500/30 text-xs font-bold uppercase">
+                    Open Now
+                  </span>
+                </div>
+              </div>
+              
+              {/* Stats Card */}
+              <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md p-3 rounded-xl border border-white/10 self-start md:self-end shadow-lg">
+                <div className="flex flex-col items-center px-4 border-r border-white/10">
+                  <div className="flex items-center gap-1 font-bold text-lg text-green-400">
+                    <Star className="h-4 w-4 fill-green-400" />
+                    {restaurant.rating_avg || 'New'}
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-medium">RATING</span>
+                </div>
+                <div className="flex flex-col items-center px-4">
+                  <div className="font-bold text-lg text-white">₹{restaurant.delivery_fee}</div>
+                  <span className="text-[10px] text-gray-400 font-medium">DELIVERY</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Message */}
+            {deliveryInfo && (
+              <div className={`mt-6 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold backdrop-blur-md border shadow-sm ${
+                deliveryInfo.isFree 
+                  ? 'bg-green-500/20 border-green-500/30 text-green-100' 
+                  : 'bg-blue-500/20 border-blue-500/30 text-blue-100'
+              }`}>
+                {deliveryInfo.isFree ? <Gift className="h-4 w-4 animate-bounce" /> : <Info className="h-4 w-4" />}
+                {deliveryInfo.message}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="flex items-center gap-2 mb-4 bg-white rounded-lg p-2 shadow-sm">
-          <Button
-            variant={vegFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setVegFilter('all')}
-            className={vegFilter === 'all' ? 'bg-orange-600 hover:bg-orange-700' : ''}
-          >
-            All Items
-          </Button>
-          <Button
-            variant={vegFilter === 'veg' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setVegFilter('veg')}
-            className={vegFilter === 'veg' ? 'bg-green-600 hover:bg-green-700' : ''}
-          >
-            <Leaf className="h-4 w-4 mr-1" />
-            Veg Only
-          </Button>
-          <Button
-            variant={vegFilter === 'non-veg' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setVegFilter('non-veg')}
-            className={vegFilter === 'non-veg' ? 'bg-red-600 hover:bg-red-700' : ''}
-          >
-            Non-Veg
-          </Button>
-        </div>
-
-        {categories.length > 0 && (
-          <div className="mb-6 overflow-x-auto">
-            <div className="flex gap-2 pb-2">
-              <Button
-                variant={selectedCategory === null ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedCategory(null)}
-                className={selectedCategory === null ? 'bg-orange-600 hover:bg-orange-700 whitespace-nowrap' : 'whitespace-nowrap'}
-              >
-                All Categories
-              </Button>
-              {categories.map(category => (
-                <Button
-                  key={category}
-                  variant={selectedCategory === category ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category)}
-                  className={selectedCategory === category ? 'bg-orange-600 hover:bg-orange-700 whitespace-nowrap' : 'whitespace-nowrap'}
-                >
-                  {category}
-                </Button>
-              ))}
+      <div className="container mx-auto px-4 -mt-4 relative z-20 max-w-4xl">
+        
+        {/* 2. MENU FILTERS */}
+        <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm py-4 -mx-4 px-4 border-b border-gray-100 shadow-sm mb-6">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center max-w-4xl mx-auto">
+            {/* Veg Toggle */}
+            <div className="flex bg-gray-100 p-1 rounded-lg self-start sm:self-auto">
+               {['all', 'veg', 'non-veg'].map((filter) => (
+                 <button
+                   key={filter}
+                   onClick={() => setVegFilter(filter as any)}
+                   className={`px-4 py-1.5 rounded-md text-sm font-bold capitalize transition-all ${
+                     vegFilter === filter 
+                       ? 'bg-white text-gray-900 shadow-sm' 
+                       : 'text-gray-500 hover:text-gray-900'
+                   }`}
+                 >
+                   {filter}
+                 </button>
+               ))}
             </div>
-          </div>
-        )}
 
-        {lootItems.length > 0 && (
-          <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Zap className="h-6 w-6 text-orange-600 animate-pulse" />
-              <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
-                Late Night Loot
-              </h2>
-              <Badge className="bg-orange-600 animate-pulse">Limited Stock!</Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {lootItems.map(item => {
-                const autoDiscount = item.base_price > item.selling_price
-                  ? Math.round(((item.base_price - item.selling_price) / item.base_price) * 100)
-                  : 0;
-                const displayDiscount = item.loot_discount_percentage || autoDiscount;
-                const isMysteryBox = item.is_mystery;
-
-                return (
-                  <Card
-                    key={item.id}
-                    className={`border-2 overflow-hidden relative ${
-                      isMysteryBox
-                        ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50'
-                        : 'border-orange-500 bg-gradient-to-br from-orange-50 to-red-50'
+            {/* Categories */}
+            <div className="w-full sm:w-auto overflow-x-auto no-scrollbar">
+               <div className="flex gap-2">
+                 <button
+                    onClick={() => setSelectedCategory(null)}
+                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-bold transition-all border ${
+                      selectedCategory === null 
+                        ? 'bg-gray-900 text-white border-gray-900' 
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    {isMysteryBox && (
-                      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs py-1 px-3 text-center font-semibold animate-pulse">
-                        MYSTERY BOX - Surprise Inside!
+                    All
+                  </button>
+                 {categories.map(category => (
+                   <button
+                     key={category}
+                     onClick={() => setSelectedCategory(selectedCategory === category ? null : category)}
+                     className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-bold transition-all border ${
+                       selectedCategory === category 
+                         ? 'bg-gray-900 text-white border-gray-900' 
+                         : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                     }`}
+                   >
+                     {category}
+                   </button>
+                 ))}
+               </div>
+             </div>
+          </div>
+        </div>
+
+        {/* 3. LIVE LOOT SECTION */}
+        {lootItems.length > 0 && (
+          <div className="mb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-gradient-to-r from-orange-500 to-red-600 p-1.5 rounded-lg shadow-lg shadow-orange-500/30">
+                  <Zap className="h-5 w-5 text-white animate-pulse" />
+                </div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">Late Night Loot</h2>
+              </div>
+              <Badge variant="destructive" className="animate-pulse px-3 py-1 text-xs">LIVE NOW</Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {lootItems.map(item => {
+                const isMystery = item.is_mystery;
+                return (
+                  <div key={item.id} className={`relative overflow-hidden rounded-2xl border-2 transition-all hover:scale-[1.01] hover:shadow-xl ${isMystery ? 'border-purple-200 bg-gradient-to-br from-white to-purple-50' : 'border-orange-100 bg-white'}`}>
+                    
+                    {/* Mystery Banner */}
+                    {isMystery && (
+                      <div className="absolute top-0 left-0 w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold text-center py-1 tracking-widest z-20">
+                        MYSTERY BOX • SURPRISE INSIDE
                       </div>
                     )}
-                    <CardHeader className={isMysteryBox ? 'pt-8' : ''}>
-                      <div className="relative">
-                        {item.image_url && (
-                          <div className="relative overflow-hidden rounded-md mb-2">
-                            <img
-                              src={item.image_url}
-                              alt={item.name}
-                              className={`w-full h-40 object-cover ${isMysteryBox ? 'blur-sm brightness-75' : ''}`}
-                            />
-                            {isMysteryBox && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <Gift className="h-16 w-16 text-white animate-bounce" />
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-lg flex items-center gap-2 flex-1">
-                            {isMysteryBox ? (
-                              <Gift className={`h-5 w-5 ${isMysteryBox ? 'text-purple-600' : 'text-orange-600'}`} />
-                            ) : (
-                              <Zap className="h-5 w-5 text-orange-600" />
-                            )}
-                            <span className={isMysteryBox ? 'text-purple-900' : ''}>{item.name}</span>
-                          </CardTitle>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge className={`${isMysteryBox ? 'bg-purple-600' : 'bg-orange-600'} text-lg px-3`}>
-                              {formatPrice(item.selling_price)}
-                            </Badge>
-                            {displayDiscount > 0 && (
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs line-through text-gray-500">{formatPrice(item.base_price)}</span>
-                                <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
-                                  {displayDiscount}% OFF
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
+
+                    <div className={`p-4 relative z-10 flex gap-4 ${isMystery ? 'pt-7' : ''}`}>
+                      {/* Text Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          {item.is_veg ? <VegIcon /> : <NonVegIcon />}
+                          {isMystery && <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-0 h-5 text-[10px]">MYSTERY</Badge>}
+                        </div>
+                        <h3 className={`font-bold text-lg mb-1 truncate ${isMystery ? 'text-purple-900' : 'text-gray-900'}`}>{item.name}</h3>
+                        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">{item.loot_description || item.description}</p>
+                        
+                        <div className="flex items-center gap-2">
+                           <span className="font-extrabold text-lg text-gray-900">₹{item.selling_price}</span>
+                           <span className="text-xs text-gray-400 line-through font-medium">₹{item.base_price}</span>
+                           {item.stock_remaining < 5 && (
+                             <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                               Only {item.stock_remaining} left
+                             </span>
+                           )}
                         </div>
                       </div>
-                      {item.loot_description && (
-                        <CardDescription className={`text-sm mt-2 ${isMysteryBox ? 'text-purple-700' : 'text-gray-700'}`}>
-                          {item.loot_description}
-                        </CardDescription>
-                      )}
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="font-medium flex items-center gap-1">
-                            <Zap className="h-3 w-3" />
-                            Only {item.stock_remaining} left!
-                          </span>
-                          {item.stock_remaining <= 5 && (
-                            <Badge variant="destructive" className="text-xs animate-pulse">
-                              Selling Fast!
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                          <div
-                            className={`h-2.5 rounded-full transition-all ${
-                              isMysteryBox
-                                ? 'bg-gradient-to-r from-purple-500 to-pink-500'
-                                : 'bg-gradient-to-r from-orange-500 to-red-500'
-                            }`}
-                            style={{ width: `${Math.min((item.stock_remaining / 50) * 100, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                      {getCartQuantity(item.id) > 0 ? (
-                        <div className="flex items-center justify-between bg-white rounded-lg p-2 border-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.id, getCartQuantity(item.id) - 1)}
-                            className="border-2"
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="font-bold text-lg">{getCartQuantity(item.id)}</span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAddToCart(item)}
-                            disabled={item.stock_remaining <= 0}
-                            className="border-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          className={`w-full text-white font-semibold shadow-lg hover:shadow-xl transition-all ${
-                            isMysteryBox
-                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
-                              : 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'
-                          }`}
-                          onClick={() => handleAddToCart(item)}
-                          disabled={item.stock_remaining <= 0}
-                        >
-                          {isMysteryBox ? (
-                            <>
-                              <Gift className="mr-2 h-4 w-4" />
-                              {item.stock_remaining > 0 ? 'Grab Mystery Box!' : 'Sold Out'}
-                            </>
+                      
+                      {/* Image & Button */}
+                      <div className="w-28 flex flex-col items-center gap-2 flex-shrink-0 relative">
+                        <div className="w-28 h-24 rounded-xl overflow-hidden shadow-md bg-gray-100 relative">
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.name} className={`w-full h-full object-cover ${isMystery ? 'blur-[2px] brightness-90' : ''}`} />
                           ) : (
-                            <>
-                              <Zap className="mr-2 h-4 w-4" />
-                              {item.stock_remaining > 0 ? 'Grab Now!' : 'Sold Out'}
-                            </>
+                            <div className="w-full h-full flex items-center justify-center text-gray-300">
+                              {isMystery ? <Gift className="h-8 w-8 text-purple-300" /> : <Zap className="h-8 w-8 text-orange-200" />}
+                            </div>
                           )}
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
+                          {isMystery && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Gift className="h-8 w-8 text-white drop-shadow-lg animate-bounce" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Add Button */}
+                        <div className="w-full absolute -bottom-3">
+                           {getCartQuantity(item.id) > 0 ? (
+                              <div className="flex items-center justify-between bg-white border border-green-200 shadow-lg rounded-lg h-9 overflow-hidden">
+                                <button onClick={() => updateQuantity(item.id, getCartQuantity(item.id) - 1)} className="w-8 h-full flex items-center justify-center hover:bg-green-50 text-green-700 transition-colors"><Minus className="w-3 h-3" /></button>
+                                <span className="text-sm font-bold text-green-700">{getCartQuantity(item.id)}</span>
+                                <button onClick={() => handleAddToCart(item)} className="w-8 h-full flex items-center justify-center hover:bg-green-50 text-green-700 transition-colors"><Plus className="w-3 h-3" /></button>
+                              </div>
+                           ) : (
+                              <button 
+                                onClick={() => handleAddToCart(item)}
+                                disabled={item.stock_remaining <= 0}
+                                className={`w-full h-9 rounded-lg font-bold text-sm shadow-lg uppercase tracking-wide transition-all active:scale-95 ${
+                                  item.stock_remaining <= 0 
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200' 
+                                    : 'bg-white text-green-600 border border-green-200 hover:bg-green-50'
+                                }`}
+                              >
+                                {item.stock_remaining <= 0 ? 'SOLD' : 'ADD'}
+                              </button>
+                           )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
         )}
 
-        {categories
-          .filter(category => selectedCategory === null || category === selectedCategory)
-          .map(category => (
-          <div key={category} className="mb-8">
-            <h2 className="text-xl font-semibold mb-4">{category}</h2>
-            <div className="space-y-4">
-              {regularItems
-                .filter(item => item.category === category)
-                .map(item => (
-                  <Card key={item.id}>
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex gap-4 flex-1">
-                        {item.image_url && (
-                          <img
-                            src={item.image_url}
-                            alt={item.name}
-                            className="w-20 h-20 object-cover rounded-md"
-                          />
-                        )}
-                        <div>
-                          <h3 className="font-semibold flex items-center gap-2">
-                            {item.is_mystery && <Gift className="h-4 w-4 text-orange-600" />}
-                            {item.name}
-                          </h3>
-                          <p className="text-sm text-gray-600">{item.category}</p>
-                          <p className="font-semibold text-orange-600 mt-1">
-                            {formatPrice(item.selling_price)}
-                          </p>
-                        </div>
-                      </div>
-                      {getCartQuantity(item.id) > 0 ? (
-                        <div className="flex items-center gap-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.id, getCartQuantity(item.id) - 1)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="font-semibold min-w-[20px] text-center">
-                            {getCartQuantity(item.id)}
+        {/* 4. MAIN MENU ITEMS */}
+        {categories.filter(cat => selectedCategory === null || cat === selectedCategory).map(category => (
+          <div key={category} className="mb-8 scroll-mt-28" id={`category-${category}`}>
+            <h3 className="text-lg font-extrabold text-gray-800 mb-4 flex items-center gap-2">
+              {category}
+              <span className="w-full h-[1px] bg-gray-200 ml-2"></span>
+            </h3>
+            
+            <div className="space-y-6">
+              {regularItems.filter(item => item.category === category).map(item => (
+                <div key={item.id} className="group bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all flex justify-between gap-4">
+                  
+                  {/* Left Side: Details */}
+                  <div className="flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        {item.is_veg ? <VegIcon /> : <NonVegIcon />}
+                        {item.is_bestseller && (
+                          <span className="text-[10px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-100">
+                            BESTSELLER
                           </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAddToCart(item)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-gray-800 text-base mb-1 group-hover:text-orange-600 transition-colors">{item.name}</h4>
+                      <div className="font-bold text-gray-900 text-sm">₹{item.selling_price}</div>
+                    </div>
+                    {item.description && (
+                      <p className="text-gray-500 text-xs leading-relaxed line-clamp-2 mt-2 font-medium">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Right Side: Image & Add Button */}
+                  <div className="w-32 h-28 flex-shrink-0 relative flex flex-col items-center">
+                    <div className="w-32 h-24 rounded-xl overflow-hidden bg-gray-50">
+                      {item.image_url ? (
+                        <img src={item.image_url} alt={item.name} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                       ) : (
-                        <Button onClick={() => handleAddToCart(item)}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add
-                        </Button>
+                        <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                          <ShoppingCart className="h-6 w-6 opacity-20" />
+                        </div>
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
+                    </div>
+
+                    {/* Floating Add Button */}
+                    <div className="absolute -bottom-2 w-28">
+                       {getCartQuantity(item.id) > 0 ? (
+                          <div className="flex items-center justify-between bg-white border border-gray-200 shadow-lg rounded-lg h-8 overflow-hidden">
+                            <button onClick={() => updateQuantity(item.id, getCartQuantity(item.id) - 1)} className="w-8 h-full flex items-center justify-center hover:bg-green-50 text-gray-600 transition-colors"><Minus className="w-3 h-3" /></button>
+                            <span className="text-sm font-bold text-green-700">{getCartQuantity(item.id)}</span>
+                            <button onClick={() => handleAddToCart(item)} className="w-8 h-full flex items-center justify-center hover:bg-green-50 text-green-700 transition-colors"><Plus className="w-3 h-3" /></button>
+                          </div>
+                       ) : (
+                          <button 
+                             onClick={() => handleAddToCart(item)}
+                             className="w-full h-8 bg-white text-green-600 font-extrabold text-sm shadow-md rounded-lg border border-gray-200 hover:bg-green-50 uppercase tracking-wide transition-all hover:shadow-lg active:scale-95"
+                          >
+                             ADD
+                          </button>
+                       )}
+                    </div>
+                  </div>
+
+                </div>
+              ))}
             </div>
           </div>
         ))}
+        
+        {/* Empty State */}
+        {menuItems.length === 0 && !loading && (
+          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-200">
+             <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+               <Search className="h-8 w-8 text-gray-400" />
+             </div>
+             <h3 className="text-lg font-bold text-gray-900">Menu not available</h3>
+             <p className="text-gray-500 text-sm mt-1">Please try again later or check another restaurant.</p>
+          </div>
+        )}
+
       </div>
 
+      {/* 5. FLOATING CART STRIP */}
       {itemCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
-          <div className="container mx-auto max-w-4xl flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">{itemCount} items</p>
-              <p className="text-lg font-bold">{formatPrice(cartTotal)}</p>
+        <div className="fixed bottom-4 left-4 right-4 z-50 animate-in slide-in-from-bottom-4 duration-300">
+          <div className="max-w-4xl mx-auto bg-[#60b246] hover:bg-[#53a639] text-white p-3.5 rounded-xl shadow-2xl shadow-green-900/30 flex items-center justify-between cursor-pointer transition-all active:scale-[0.99]" onClick={() => router.push(`/r/${slug}/checkout`)}>
+            <div className="flex flex-col pl-2">
+               <span className="text-[10px] font-bold uppercase tracking-wider opacity-90">{itemCount} ITEMS ADDED</span>
+               <span className="text-lg font-extrabold">₹{cartTotal} <span className="text-xs font-normal ml-1 opacity-90">+ taxes</span></span>
             </div>
-            <Link href={`/r/${slug}/checkout`}>
-              <Button size="lg" className="bg-orange-600 hover:bg-orange-700">
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                Checkout
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2 font-bold pr-2 text-sm bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm hover:bg-white/30 transition-colors">
+               View Cart <ChevronRight className="h-4 w-4" />
+            </div>
           </div>
         </div>
       )}
+      
     </div>
   );
 }

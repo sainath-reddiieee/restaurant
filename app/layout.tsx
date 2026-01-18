@@ -4,27 +4,13 @@ import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/components/providers/auth-provider';
 import { CartProvider } from '@/components/providers/cart-provider';
 import { Toaster } from '@/components/ui/toaster';
+import { Footer } from '@/components/footer'; // Import the new footer
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'GO515 - Food Delivery Platform',
   description: 'Digital Storefront & Logistics Platform for Local Restaurants',
-  openGraph: {
-    images: [
-      {
-        url: 'https://bolt.new/static/og_default.png',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    images: [
-      {
-        url: 'https://bolt.new/static/og_default.png',
-      },
-    ],
-  },
 };
 
 export default function RootLayout({
@@ -37,7 +23,12 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <CartProvider>
-            {children}
+            <div className="flex flex-col min-h-screen">
+              <div className="flex-grow">
+                {children}
+              </div>
+              <Footer /> {/* Add Footer here */}
+            </div>
             <Toaster />
           </CartProvider>
         </AuthProvider>

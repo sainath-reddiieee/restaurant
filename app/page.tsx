@@ -8,9 +8,22 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/lib/supabase/client';
-import { Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, User, Flame, Bike, Zap, Gift, Sparkles } from 'lucide-react';
+import { 
+  Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, 
+  User, Flame, Bike, Zap, Gift, Sparkles, Utensils, Pizza, Sandwich,
+  Navigation, ChevronDown, Bell, CheckCircle2, ArrowRight, X
+} from 'lucide-react';
 import { formatPrice } from '@/lib/format';
+
+const LIVE_UPDATES = [
+  "🔥 Someone nearby just ordered Chicken Biryani",
+  "🍕 New order: 2x Large Peppy Paneer Pizzas",
+  "🎁 3 people are claiming Mystery Boxes right now",
+  "⚡ Flash Sale: Spicy Shawarma is 40% OFF",
+  "🛵 12 Riders are active in your area"
+];
 
 interface Restaurant {
   id: string;
@@ -43,39 +56,32 @@ export default function Home() {
   const { user, profile, loading: authLoading } = useAuth();
   const { itemCount } = useCart();
   const router = useRouter();
+  
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>([]);
   const [lootItems, setLootItems] = useState<LootItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const [locationName, setLocationName] = useState<string>('Select Location');
+  const [manualLocation, setManualLocation] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
+  const [isLocationOpen, setIsLocationOpen] = useState(false);
+  const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
 
   useEffect(() => {
     if (!authLoading && user && profile) {
-      switch (profile.role) {
-        case 'SUPER_ADMIN':
-          router.push('/admin');
-          return;
-        case 'RESTAURANT':
-          router.push('/dashboard');
-          return;
-      }
+      if (profile.role === 'SUPER_ADMIN') router.push('/admin');
+      if (profile.role === 'RESTAURANT') router.push('/dashboard');
     }
   }, [user, profile, authLoading, router]);
 
   useEffect(() => {
     const fetchData = async () => {
       const [restaurantsResult, lootItemsResult] = await Promise.all([
-        supabase
-          .from('restaurants')
-          .select('*')
-          .eq('is_active', true)
-          .order('name'),
-        supabase
-          .from('menu_items')
-          .select(`
-            *,
-            restaurants!inner(name, slug, is_active)
-          `)
+        supabase.from('restaurants').select('*').eq('is_active', true).order('name'),
+        supabase.from('menu_items')
+          .select(`*, restaurants!inner(name, slug, is_active)`)
           .eq('is_clearance', true)
           .eq('is_available', true)
           .eq('restaurants.is_active', true)
@@ -88,81 +94,130 @@ export default function Home() {
         setRestaurants(restaurantsResult.data);
         setFilteredRestaurants(restaurantsResult.data);
       }
-
-      if (lootItemsResult.data) {
-        setLootItems(lootItemsResult.data as any);
-      }
-
+      if (lootItemsResult.data) setLootItems(lootItemsResult.data as any);
       setLoading(false);
     };
 
     fetchData();
+    detectLocation();
+
+    const interval = setInterval(() => {
+      setCurrentUpdateIndex((prev) => (prev + 1) % LIVE_UPDATES.length);
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (searchQuery.trim()) {
-      const filtered = restaurants.filter(r =>
-        r.name.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const filtered = restaurants.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
       setFilteredRestaurants(filtered);
     } else {
       setFilteredRestaurants(restaurants);
     }
   }, [searchQuery, restaurants]);
 
+  const detectLocation = () => {
+    setIsLocating(true);
+    if (!('geolocation' in navigator)) {
+      setLocationName('Location Unavailable');
+      setIsLocating(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          if (!response.ok) throw new Error('Geocoding failed');
+          const data = await response.json();
+          const address = data.address;
+          const area = address.suburb || address.neighbourhood || address.residential || address.road || '';
+          const city = address.city || address.town || address.village || address.county || '';
+          const finalLocation = area ? `${area}, ${city}` : city;
+          setLocationName(finalLocation || 'Unknown Location');
+        } catch (error) {
+          console.error('Error fetching address:', error);
+          setLocationName('GPS Active');
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        console.error('Location error:', error);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const saveManualLocation = () => {
+    if (manualLocation.trim()) {
+      setLocationName(manualLocation);
+      setIsLocationOpen(false);
+    }
+  };
+
+  const calculateOriginalPrice = (item: LootItem) => {
+    if (item.loot_discount_percentage && item.loot_discount_percentage > 0) {
+      // Smart Calculation: If discount is 50%, Price is 250, then Original was 500.
+      return Math.round(item.selling_price / (1 - (item.loot_discount_percentage / 100)));
+    }
+    return item.base_price > item.selling_price ? item.base_price : Math.round(item.selling_price * 1.2);
+  };
+
+  const mysteryItems = lootItems.filter(item => item.is_mystery);
+  const liveLootItems = lootItems.filter(item => !item.is_mystery);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform duration-300">
-                <ChefHat className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+    <div className="min-h-screen bg-[#f2f4f7] pb-24 font-sans selection:bg-orange-200">
+      
+      {/* TICKER */}
+      <div className="bg-[#111] text-white text-[10px] sm:text-xs font-medium py-2 overflow-hidden relative z-50">
+        <div className="container mx-auto px-4 flex items-center justify-center gap-2 animate-in fade-in slide-in-from-top-2 duration-700 key={currentUpdateIndex}">
+          <Bell className="w-3 h-3 text-orange-400 fill-orange-400 animate-pulse" />
+          <span className="tracking-wide opacity-90 truncate">
+            {LIVE_UPDATES[currentUpdateIndex]}
+          </span>
+        </div>
+      </div>
+
+      {/* HEADER */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-1 overflow-hidden">
+              <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center shadow-lg transform hover:rotate-6 transition-transform cursor-pointer flex-shrink-0">
+                <ChefHat className="w-6 h-6 text-white" />
               </div>
-              <div>
-                <h1 className="text-base sm:text-xl font-bold text-gray-900">GO515</h1>
-                <p className="text-[10px] sm:text-xs text-gray-500 -mt-0.5">Local Food Delivery</p>
+              <div className="flex flex-col cursor-pointer group min-w-0" onClick={() => setIsLocationOpen(true)}>
+                <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-widest">
+                  <Navigation className="w-3 h-3" />
+                  {isLocating ? 'Detecting...' : 'Delivering To'}
+                </div>
+                <div className="flex items-center gap-1 text-gray-900 text-sm font-bold group-hover:text-orange-600 transition-colors">
+                  <span className="truncate max-w-[150px] sm:max-w-[300px] block">
+                    {locationName}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               {!user && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push('/rider-signup')}
-                    className="hidden md:flex text-xs sm:text-sm px-2 sm:px-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                  >
-                    <Bike className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Become a Rider
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push('/partner')}
-                    className="hidden md:flex text-xs sm:text-sm px-2 sm:px-3"
-                  >
-                    <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                    Partner Login
-                  </Button>
-                </>
+                <Button variant="outline" size="sm" onClick={() => router.push('/partner')} className="hidden sm:flex rounded-full border-gray-200 hover:bg-gray-50 text-xs">
+                  Partner Login
+                </Button>
               )}
               {itemCount > 0 && (
-                <Button
-                  size="sm"
-                  className="relative bg-orange-500 hover:bg-orange-600 animate-in zoom-in duration-300 hover:scale-105 transition-transform shadow-lg text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
-                  onClick={() => {
+                <Button size="sm" className="bg-black text-white hover:bg-gray-800 rounded-full px-4 shadow-xl shadow-orange-500/20 transition-transform hover:scale-105 active:scale-95" onClick={() => {
                     const firstRestaurantInCart = JSON.parse(localStorage.getItem('cart') || '[]')[0]?.restaurant_id;
                     if (firstRestaurantInCart) {
                       const restaurant = restaurants.find(r => r.id === firstRestaurantInCart);
-                      if (restaurant) {
-                        router.push(`/r/${restaurant.slug}/checkout`);
-                      }
+                      if (restaurant) router.push(`/r/${restaurant.slug}/checkout`);
                     }
-                  }}
-                >
-                  <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                  <span className="hidden xs:inline">Cart </span>({itemCount})
+                  }}>
+                  <ShoppingCart className="h-4 w-4 mr-1.5" />
+                  <span className="font-bold">{itemCount}</span>
                 </Button>
               )}
             </div>
@@ -170,321 +225,188 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-6xl">
-        <div className="mb-4 sm:mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 sm:mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">Order Food Nearby</h2>
-          <p className="text-gray-600 text-xs sm:text-sm mb-3 sm:mb-4 animate-in fade-in delay-150 duration-700">Browse restaurants and add items to cart. Login only required at checkout.</p>
+      {/* HERO */}
+      <div className="relative bg-[#1a1a1a] text-white pt-10 pb-20 px-4 rounded-b-[2.5rem] shadow-2xl overflow-hidden mb-10">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-[100px] -right-[100px] w-[500px] h-[500px] bg-purple-600/40 rounded-full blur-[120px] animate-pulse"></div>
+          <div className="absolute -bottom-[100px] -left-[100px] w-[500px] h-[500px] bg-orange-600/30 rounded-full blur-[120px] animate-pulse delay-1000"></div>
+          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20"></div>
+        </div>
+        <div className="relative z-10 container mx-auto text-center max-w-2xl mt-4">
+          <Badge className="bg-white/10 text-white border-white/10 backdrop-blur-md mb-6 px-4 py-1.5 text-xs font-medium rounded-full hover:bg-white/20 transition-colors cursor-default">
+            🚀 Superfast Delivery in Your City
+          </Badge>
+          <h1 className="text-4xl sm:text-6xl font-black mb-6 tracking-tight leading-[1.1] drop-shadow-xl">
+            Craving something <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">Delicious?</span>
+          </h1>
+          <div className="relative max-w-lg mx-auto group mt-8">
+            <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-purple-500 to-red-500 rounded-full blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+            <div className="relative flex items-center bg-white rounded-full p-2 shadow-2xl transform transition-transform group-hover:scale-[1.01]">
+              <div className="pl-3 pr-2 text-gray-400"><Search className="w-5 h-5" /></div>
+              <input type="text" placeholder="Biryani, Pizza, Cake..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none h-10 text-sm sm:text-base w-full" />
+              <Button className="rounded-full px-6 h-10 bg-black hover:bg-gray-900 text-white font-bold text-sm shadow-lg">Search</Button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <div className="relative animate-in fade-in slide-in-from-bottom-4 delay-300 duration-700">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-400 transition-colors" />
-            <Input
-              type="text"
-              placeholder="Search restaurants..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 sm:pl-10 py-4 sm:py-6 text-sm sm:text-base border-2 focus:border-orange-500 transition-all duration-300 focus:shadow-lg"
-            />
+      <main className="container mx-auto px-4 max-w-7xl -mt-14 relative z-20 space-y-10">
+        
+        {/* CATEGORIES */}
+        <div className="bg-white/80 backdrop-blur-lg rounded-3xl p-6 shadow-xl shadow-gray-200/50 border border-white/50">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 ml-1">What's on your mind?</h3>
+          <div className="flex gap-4 sm:gap-8 overflow-x-auto no-scrollbar pb-2 px-1">
+            {[{ name: 'Biryani', icon: '🥘', color: 'bg-orange-100' }, { name: 'Pizza', icon: '🍕', color: 'bg-red-100' }, { name: 'Burger', icon: '🍔', color: 'bg-yellow-100' }, { name: 'Shawarma', icon: '🥙', color: 'bg-green-100' }, { name: 'Desserts', icon: '🧁', color: 'bg-pink-100' }, { name: 'Healthy', icon: '🥗', color: 'bg-emerald-100' }].map((cat) => (
+              <div key={cat.name} className="flex flex-col items-center gap-2 cursor-pointer group min-w-[70px]">
+                <div className={`${cat.color} w-16 h-16 rounded-[1.5rem] flex items-center justify-center text-3xl shadow-sm border-2 border-white group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                  <span className="drop-shadow-sm filter">{cat.icon}</span>
+                </div>
+                <span className="text-xs font-bold text-gray-600 group-hover:text-black transition-colors">{cat.name}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {lootItems.filter(item => item.is_mystery).length > 0 && (
-          <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 delay-400 duration-700">
-            <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-20"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <Gift className="h-8 w-8 text-white animate-bounce" />
-                    <h2 className="text-2xl sm:text-3xl font-bold text-white">Mystery Boxes</h2>
-                    <Badge className="bg-white text-purple-600 font-bold animate-pulse">SURPRISE!</Badge>
+        {/* LOOT SECTION */}
+        {(mysteryItems.length > 0 || liveLootItems.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Mystery Box */}
+            {mysteryItems.length > 0 && (
+              <div className="bg-gradient-to-br from-violet-600 to-indigo-700 rounded-[2rem] p-6 relative overflow-hidden shadow-2xl shadow-indigo-500/20 group cursor-pointer ring-1 ring-white/20 hover:scale-[1.01] transition-transform duration-500">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <Badge className="bg-white/20 text-white backdrop-blur-md border-0 mb-2 hover:bg-white/30">MYSTERY BOX</Badge>
+                      <h2 className="text-2xl font-black text-white tracking-tight">Surprise Savings</h2>
+                      <p className="text-indigo-200 text-sm font-medium mt-1">Get premium food at insane prices.</p>
+                    </div>
+                    <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md border border-white/10"><Gift className="w-6 h-6 text-white animate-bounce" /></div>
                   </div>
-                </div>
-                <p className="text-white/90 mb-6 text-sm sm:text-base">
-                  Open a mystery box and discover amazing surprises at unbeatable prices!
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {lootItems.filter(item => item.is_mystery).map(item => {
-                    const autoDiscount = item.base_price > item.selling_price
-                      ? Math.round(((item.base_price - item.selling_price) / item.base_price) * 100)
-                      : 0;
-                    const displayDiscount = item.loot_discount_percentage || autoDiscount;
-
-                    return (
-                      <Card
-                        key={item.id}
-                        className="overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-105 border-2 border-white/50 bg-gradient-to-br from-white to-purple-50"
-                        onClick={() => router.push(`/r/${item.restaurants.slug}`)}
-                      >
-                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs py-1.5 px-3 text-center font-bold animate-pulse">
-                          MYSTERY BOX - SURPRISE INSIDE!
-                        </div>
-                        <div className="p-4">
-                          <div className="flex items-start justify-between gap-2 mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <Gift className="h-5 w-5 text-purple-600" />
-                                <h3 className="font-bold text-base line-clamp-1">{item.name}</h3>
-                              </div>
-                              <p className="text-xs text-purple-600 mb-2 font-medium">{item.restaurants.name}</p>
-                              {item.loot_description && (
-                                <p className="text-sm text-gray-700 line-clamp-2 mb-2 bg-purple-50 p-2 rounded border border-purple-200">
-                                  {item.loot_description}
-                                </p>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <Badge className="bg-purple-600 text-base px-3">
-                                {formatPrice(item.selling_price)}
-                              </Badge>
-                              {displayDiscount > 0 && (
-                                <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs font-bold">
-                                  {displayDiscount}% OFF
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="text-gray-700 flex items-center gap-1 font-medium">
-                                <Sparkles className="h-4 w-4 text-purple-600" />
-                                Only {item.stock_remaining} boxes left!
-                              </span>
-                              {item.stock_remaining <= 5 && (
-                                <Badge variant="destructive" className="text-[10px] px-2 py-0.5 animate-pulse">
-                                  Almost Gone!
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="w-full bg-purple-200 rounded-full h-2 overflow-hidden">
-                              <div
-                                className="h-2 rounded-full transition-all bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse"
-                                style={{ width: `${Math.min((item.stock_remaining / 50) * 100, 100)}%` }}
-                              />
-                            </div>
+                  <div className="space-y-3">
+                    {mysteryItems.slice(0, 2).map(item => (
+                      <div key={item.id} onClick={() => router.push(`/r/${item.restaurants.slug}`)} className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl flex items-center justify-between hover:bg-white/20 transition-all cursor-pointer border border-white/5">
+                        <div className="flex items-center gap-3.5">
+                          <div className="w-10 h-10 bg-indigo-500/30 rounded-xl flex items-center justify-center text-lg shadow-inner">🎁</div>
+                          <div>
+                            <div className="text-white font-bold text-sm">{item.name}</div>
+                            <div className="text-indigo-200 text-xs font-medium">{item.restaurants.name}</div>
                           </div>
                         </div>
-                      </Card>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {lootItems.filter(item => !item.is_mystery).length > 0 && (
-          <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 delay-500 duration-700">
-            <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-2xl p-6 sm:p-8 shadow-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <Zap className="h-7 w-7 text-white animate-pulse" />
-                  <h2 className="text-2xl sm:text-3xl font-bold text-white">Live Loot Mode</h2>
-                  <Badge className="bg-white text-orange-600 font-bold animate-pulse">LIVE NOW</Badge>
-                </div>
-              </div>
-              <p className="text-white/90 mb-6 text-sm sm:text-base">
-                Flash deals with limited stock - grab them before they're gone!
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {lootItems.filter(item => !item.is_mystery).map(item => {
-                  const autoDiscount = item.base_price > item.selling_price
-                    ? Math.round(((item.base_price - item.selling_price) / item.base_price) * 100)
-                    : 0;
-                  const displayDiscount = item.loot_discount_percentage || autoDiscount;
-
-                  return (
-                    <Card
-                      key={item.id}
-                      className="overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-105 border-2 border-white/50 bg-white"
-                      onClick={() => router.push(`/r/${item.restaurants.slug}`)}
-                    >
-                      <div className="p-4">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Zap className="h-4 w-4 text-orange-600" />
-                              <h3 className="font-bold text-sm line-clamp-1">{item.name}</h3>
-                            </div>
-                            <p className="text-xs text-orange-600 mb-1 font-medium">{item.restaurants.name}</p>
-                            {item.loot_description && (
-                              <p className="text-xs text-gray-600 line-clamp-1 mb-2">{item.loot_description}</p>
-                            )}
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge className="bg-orange-600 text-sm">
-                              {formatPrice(item.selling_price)}
-                            </Badge>
-                            {displayDiscount > 0 && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs font-bold">
-                                {displayDiscount}% OFF
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600 flex items-center gap-1">
-                              <Sparkles className="h-3 w-3" />
-                              {item.stock_remaining} left
-                            </span>
-                            {item.stock_remaining <= 5 && (
-                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 animate-pulse">
-                                Almost Gone!
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="w-full bg-orange-200 rounded-full h-1.5 overflow-hidden">
-                            <div
-                              className="h-1.5 rounded-full transition-all bg-gradient-to-r from-orange-500 to-red-500"
-                              style={{ width: `${Math.min((item.stock_remaining / 50) * 100, 100)}%` }}
-                            />
-                          </div>
-                        </div>
+                        <Badge className="bg-white text-indigo-700 font-bold px-3">{formatPrice(item.selling_price)}</Badge>
                       </div>
-                    </Card>
-                  );
-                })}
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Live Loot */}
+            {liveLootItems.length > 0 && (
+              <div className="bg-gradient-to-br from-orange-500 to-red-600 rounded-[2rem] p-6 relative overflow-hidden shadow-2xl shadow-orange-500/20 group cursor-pointer ring-1 ring-white/20 hover:scale-[1.01] transition-transform duration-500">
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-yellow-400/20 rounded-full blur-3xl -ml-16 -mb-16 pointer-events-none"></div>
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <Badge className="bg-white text-orange-600 border-0 mb-2 font-bold shadow-lg animate-pulse">LIVE NOW</Badge>
+                      <h2 className="text-2xl font-black text-white tracking-tight">Flash Deals</h2>
+                      <p className="text-orange-100 text-sm font-medium mt-1">Limited stock. Gone in minutes.</p>
+                    </div>
+                    <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md border border-white/10"><Zap className="w-6 h-6 text-white" /></div>
+                  </div>
+                  <div className="space-y-3">
+                    {liveLootItems.slice(0, 2).map(item => {
+                      const originalPrice = calculateOriginalPrice(item);
+                      return (
+                        <div key={item.id} onClick={() => router.push(`/r/${item.restaurants.slug}`)} className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl flex items-center justify-between hover:bg-white/20 transition-all cursor-pointer border border-white/5">
+                          <div className="flex items-center gap-3.5">
+                            <div className="w-10 h-10 bg-orange-500/30 rounded-xl flex items-center justify-center text-lg shadow-inner">⚡</div>
+                            <div>
+                              <div className="text-white font-bold text-sm">{item.name}</div>
+                              <div className="text-orange-100 text-xs font-medium">{item.restaurants.name}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-white font-bold text-sm">{formatPrice(item.selling_price)}</span>
+                            <span className="block text-orange-200 text-[10px] line-through font-medium">{formatPrice(originalPrice)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
+        {/* RESTAURANTS */}
+        <div>
+          <div className="flex items-center justify-between mb-6 px-1">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Sparkles className="w-5 h-5 text-yellow-500 fill-yellow-500" />Popular Near You</h2>
           </div>
-        ) : filteredRestaurants.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No restaurants found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {filteredRestaurants.map((restaurant, index) => (
-              <Card
-                key={restaurant.id}
-                className="overflow-hidden hover:shadow-2xl transition-all duration-500 cursor-pointer group border-2 border-transparent hover:border-orange-200 animate-in fade-in zoom-in duration-700"
-                style={{ animationDelay: `${index * 100}ms` }}
-                onClick={() => router.push(`/r/${restaurant.slug}`)}
-              >
-                <div className="relative h-32 sm:h-40 bg-gradient-to-br from-orange-100 to-red-100 overflow-hidden">
-                  {restaurant.image_url ? (
-                    <img
-                      src={restaurant.image_url}
-                      alt={restaurant.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 group-hover:rotate-2"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ChefHat className="h-12 w-12 sm:h-16 sm:w-16 text-orange-300 group-hover:scale-110 transition-transform duration-500" />
+          {loading ? (
+            <div className="flex justify-center py-20"><Loader2 className="h-10 w-10 animate-spin text-orange-500" /></div>
+          ) : filteredRestaurants.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-gray-200 mx-1">
+              <Search className="h-8 w-8 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-gray-900">No restaurants found</h3>
+              <p className="text-gray-500 text-sm mt-1">Try searching for something else</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-10">
+              {filteredRestaurants.map((restaurant, index) => (
+                <Card key={restaurant.id} className="group border-0 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-500 overflow-hidden bg-white rounded-[1.5rem] cursor-pointer ring-1 ring-gray-100" onClick={() => router.push(`/r/${restaurant.slug}`)}>
+                  <div className="relative h-52 overflow-hidden">
+                    {restaurant.image_url ? (
+                      <img src={restaurant.image_url} alt={restaurant.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-100 flex items-center justify-center"><ChefHat className="w-12 h-12 text-gray-300" /></div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90"></div>
+                    <div className="absolute bottom-4 left-4 right-4 text-white">
+                      <h3 className="font-bold text-xl mb-1.5 drop-shadow-md tracking-tight leading-none">{restaurant.name}</h3>
+                      <div className="flex items-center gap-2 text-xs font-medium">
+                        <div className="bg-green-500 text-white px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-sm"><span className="text-[10px]">★</span> 4.2</div>
+                        <span className="opacity-80">• 30-40 mins</span>
+                      </div>
                     </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                  <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2">
-                    <Badge className="bg-green-500 text-white shadow-lg animate-pulse text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5">Open</Badge>
-                  </div>
-                </div>
-                <div className="p-3 sm:p-4 group-hover:bg-orange-50/50 transition-colors duration-300">
-                  <h3 className="font-bold text-base sm:text-lg mb-1 sm:mb-2 text-gray-900 group-hover:text-orange-600 transition-colors duration-300">{restaurant.name}</h3>
-                  <div className="flex items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
-                    <div className="flex items-center gap-1 group-hover:text-orange-600 transition-colors duration-300">
-                      <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>30-40 min</span>
-                    </div>
-                    <div className="flex items-center gap-1 group-hover:text-orange-600 transition-colors duration-300">
-                      <MapPin className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span>₹{restaurant.delivery_fee}</span>
+                    <div className="absolute top-4 right-4">
+                       <Badge className="bg-white/90 text-green-700 backdrop-blur-md shadow-lg border-0 px-2.5 py-0.5 font-bold hover:bg-white text-xs">OPEN</Badge>
                     </div>
                   </div>
-                  {restaurant.free_delivery_threshold && (
-                    <p className="text-[10px] sm:text-xs text-green-600 mt-1.5 sm:mt-2 font-medium animate-in fade-in delay-100">
-                      Free delivery above ₹{restaurant.free_delivery_threshold}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-8 sm:mt-12 bg-gradient-to-r from-orange-500 via-red-500 to-red-600 rounded-xl sm:rounded-2xl p-4 sm:p-6 text-white shadow-2xl transition-all duration-500 animate-in fade-in slide-in-from-bottom-4 delay-500">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-white/20 rounded-lg sm:rounded-xl flex items-center justify-center flex-shrink-0 animate-pulse">
-              <Flame className="h-5 w-5 sm:h-6 sm:w-6 animate-bounce" />
+                  <div className="p-4 flex items-center justify-between bg-white">
+                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50 px-2 py-1 rounded-md">Fast Food • Biryani</span>
+                     {restaurant.free_delivery_threshold && (
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-100"><Gift className="w-3 h-3" />FREE DELIVERY</div>
+                     )}
+                  </div>
+                </Card>
+              ))}
             </div>
-            <div className="flex-1">
-              <h3 className="font-bold text-base sm:text-lg mb-1 sm:mb-2 flex flex-wrap items-center gap-2">
-                Late Night Loot Mode
-                <span className="text-[10px] sm:text-xs bg-white/20 px-2 py-0.5 sm:py-1 rounded-full animate-pulse">LIVE</span>
-              </h3>
-              <p className="text-white/90 text-xs sm:text-sm leading-relaxed">
-                Look for ⚡ flash sale items at massive discounts when browsing restaurant menus. Limited stock, first come first served!
-              </p>
-            </div>
-          </div>
+          )}
         </div>
       </main>
 
-      <section className="mt-8 sm:mt-12 bg-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg border border-gray-100 animate-in fade-in slide-in-from-bottom-4 delay-600">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">About GO515</h2>
-        <div className="grid md:grid-cols-2 gap-6 sm:gap-8 text-sm sm:text-base">
-          <div>
-            <p className="text-gray-700 leading-relaxed mb-4">
-              GO515 is a hyperlocal food delivery platform designed specifically for tier-2 and tier-3 cities. We connect local restaurants with customers through a seamless digital storefront experience.
-            </p>
-            <p className="text-gray-700 leading-relaxed">
-              Our platform features innovative Late Night Loot Mode for flash sales, guest checkout for convenience, and powerful restaurant management tools.
-            </p>
+      <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader><DialogTitle className="text-center pb-2">Select Location</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <Button variant="outline" className="w-full justify-start h-12 text-orange-600 border-orange-100 bg-orange-50/50 hover:bg-orange-50 font-bold" onClick={() => { detectLocation(); setIsLocationOpen(false); }}>
+              <Navigation className="w-4 h-4 mr-2" />Use Current Location (GPS)
+            </Button>
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-100" /></div>
+              <div className="relative flex justify-center text-xs uppercase tracking-widest"><span className="bg-background px-2 text-gray-400">Or type manually</span></div>
+            </div>
+            <div className="flex gap-2">
+              <Input placeholder="Enter city or area" value={manualLocation} onChange={(e) => setManualLocation(e.target.value)} className="h-11 rounded-xl" />
+              <Button size="icon" onClick={saveManualLocation} className="h-11 w-11 rounded-xl bg-black hover:bg-gray-800"><ArrowRight className="w-4 h-4" /></Button>
+            </div>
           </div>
-          <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-lg p-4 sm:p-6">
-            <h3 className="font-bold text-lg sm:text-xl text-gray-900 mb-3 sm:mb-4">Key Features</h3>
-            <ul className="space-y-2 text-gray-700">
-              <li className="flex items-start gap-2">
-                <span className="text-orange-500 mt-1">•</span>
-                <span>Browse without login, checkout as guest</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-orange-500 mt-1">•</span>
-                <span>Late Night Loot Mode for flash sales</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-orange-500 mt-1">•</span>
-                <span>Real-time order tracking</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-orange-500 mt-1">•</span>
-                <span>Multiple payment options</span>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-6 sm:mt-8 bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg animate-in fade-in slide-in-from-bottom-4 delay-700">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Contact Us</h2>
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 text-sm sm:text-base">
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <h3 className="font-semibold mb-2 text-orange-400">Phone</h3>
-            <p className="text-white/90">+91 9441414140</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <h3 className="font-semibold mb-2 text-orange-400">Email</h3>
-            <p className="text-white/90">psainath123@gmail.com</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <h3 className="font-semibold mb-2 text-orange-400">Location</h3>
-            <p className="text-white/90">PNR Kitchen Tadipatri</p>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-gray-200 mt-8 sm:mt-12 py-6 sm:py-8 bg-white animate-in fade-in slide-in-from-bottom-4 delay-800">
-        <div className="container mx-auto px-3 sm:px-4 text-center text-xs sm:text-sm text-gray-600">
-          {!user && (
-            <p className="mb-2">Restaurant Partner? <button onClick={() => router.push('/partner')} className="text-orange-600 hover:underline font-medium hover:text-orange-700 transition-colors duration-300">Login here</button></p>
-          )}
-          <p className="text-[10px] sm:text-xs text-gray-500">© 2026 GO515 for Tier-2 Cities.</p>
-        </div>
-      </footer>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
